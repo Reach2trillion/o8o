@@ -4,7 +4,6 @@ from datetime import date, datetime, timedelta
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import tagged
-from odoo.tools import mute_logger
 
 from .common import CheckinmeCommon, CHECKIN_LAT, CHECKIN_LNG
 
