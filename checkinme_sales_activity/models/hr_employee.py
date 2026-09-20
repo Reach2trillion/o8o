@@ -6,7 +6,7 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
     checkinme_telegram_chat_id = fields.Char(
-        string='Telegram Chat ID',
+        string='Telegram Chat ID', groups='hr.group_hr_user',
         help="Personal Telegram chat id of this person. When this employee is the manager "
              "(or department manager) of a salesperson, check-in notifications are also sent here. "
              "Tip: message @userinfobot on Telegram to get your chat id.")

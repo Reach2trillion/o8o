@@ -169,10 +169,9 @@ class CheckinmeTarget(models.Model):
 
     def _search_is_current(self, operator, value):
         today = self.env['checkinme.checkin']._get_today()
-        domain = [('date_from', '<=', today), ('date_to', '>=', today)]
         if (operator == '=' and value) or (operator == '!=' and not value):
-            return domain
-        return ['!'] + domain
+            return [('date_from', '<=', today), ('date_to', '>=', today)]
+        return ['|', ('date_from', '>', today), ('date_to', '<', today)]
 
     def _search_status(self, operator, value):
         """Status is computed live (actuals + today); evaluate it on the candidate targets."""

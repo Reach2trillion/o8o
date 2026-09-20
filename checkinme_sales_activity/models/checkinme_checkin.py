@@ -227,15 +227,22 @@ class CheckinmeCheckin(models.Model):
             rec.distance_to_partner = distance
             rec.location_status = 'verified' if distance <= max_distance else 'far'
 
-    @api.depends('partner_id')
+    @api.depends('partner_id', 'checkin_time')
     def _compute_is_new_customer(self):
+        """A customer is new when this is the earliest (non-cancelled) check-in recorded for it.
+        Ordering by (checkin_time, id) keeps the result deterministic whatever the compute timing."""
         for rec in self:
             if not rec.partner_id:
                 rec.is_new_customer = False
                 continue
             domain = [('partner_id', '=', rec.partner_id.id), ('state', '!=', 'cancel')]
-            if rec._origin.id:
-                domain.append(('id', '!=', rec._origin.id))
+            origin_id = rec._origin.id
+            if origin_id:
+                domain.append(('id', '!=', origin_id))
+            if rec.checkin_time:
+                earlier = ['|', ('checkin_time', '<', rec.checkin_time),
+                           '&', ('checkin_time', '=', rec.checkin_time), ('id', '<', origin_id or 0)]
+                domain = domain + earlier
             rec.is_new_customer = not self.sudo().search_count(domain, limit=1)
 
     @api.depends('sale_order_ids.state', 'sale_order_ids.amount_untaxed', 'sale_order_ids.currency_id')

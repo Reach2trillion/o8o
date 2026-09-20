@@ -1,0 +1,523 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- ============================================================
+             Users (one sales manager + three field sales representatives)
+             Login = password for convenience in demo databases.
+             ============================================================ -->
+        <record id="demo_user_manager" model="res.users">
+            <field name="name">Heng Sokha</field>
+            <field name="login">checkinme_manager</field>
+            <field name="password">checkinme_manager</field>
+            <field name="email">sokha.heng@example.com</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="company_ids" eval="[Command.set([ref('base.main_company')])]"/>
+            <field name="groups_id" eval="[Command.set([
+                ref('base.group_user'),
+                ref('checkinme_sales_activity.group_checkinme_manager'),
+                ref('sales_team.group_sale_manager')])]"/>
+        </record>
+
+        <record id="demo_user_rep1" model="res.users">
+            <field name="name">Sok Dara</field>
+            <field name="login">checkinme_rep1</field>
+            <field name="password">checkinme_rep1</field>
+            <field name="email">dara.sok@example.com</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="company_ids" eval="[Command.set([ref('base.main_company')])]"/>
+            <field name="groups_id" eval="[Command.set([
+                ref('base.group_user'),
+                ref('checkinme_sales_activity.group_checkinme_user'),
+                ref('sales_team.group_sale_salesman')])]"/>
+        </record>
+
+        <record id="demo_user_rep2" model="res.users">
+            <field name="name">Chan Sopheap</field>
+            <field name="login">checkinme_rep2</field>
+            <field name="password">checkinme_rep2</field>
+            <field name="email">sopheap.chan@example.com</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="company_ids" eval="[Command.set([ref('base.main_company')])]"/>
+            <field name="groups_id" eval="[Command.set([
+                ref('base.group_user'),
+                ref('checkinme_sales_activity.group_checkinme_user'),
+                ref('sales_team.group_sale_salesman')])]"/>
+        </record>
+
+        <record id="demo_user_rep3" model="res.users">
+            <field name="name">Kim Vanna</field>
+            <field name="login">checkinme_rep3</field>
+            <field name="password">checkinme_rep3</field>
+            <field name="email">vanna.kim@example.com</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="company_ids" eval="[Command.set([ref('base.main_company')])]"/>
+            <field name="groups_id" eval="[Command.set([
+                ref('base.group_user'),
+                ref('checkinme_sales_activity.group_checkinme_user'),
+                ref('sales_team.group_sale_salesman')])]"/>
+        </record>
+
+        <!-- ============================================================
+             Department and employees
+             ============================================================ -->
+        <record id="demo_department_sales" model="hr.department">
+            <field name="name">Field Sales</field>
+            <field name="company_id" ref="base.main_company"/>
+        </record>
+
+        <record id="demo_employee_manager" model="hr.employee">
+            <field name="name">Heng Sokha</field>
+            <field name="user_id" ref="demo_user_manager"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="department_id" ref="demo_department_sales"/>
+            <field name="job_title">Sales Manager</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="mobile_phone">+855 12 800 001</field>
+            <field name="checkinme_telegram_chat_id">123456789</field>
+        </record>
+
+        <!-- The manager heads the Field Sales department (record update) -->
+        <record id="demo_department_sales" model="hr.department">
+            <field name="manager_id" ref="demo_employee_manager"/>
+        </record>
+
+        <record id="demo_employee_rep1" model="hr.employee">
+            <field name="name">Sok Dara</field>
+            <field name="user_id" ref="demo_user_rep1"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="department_id" ref="demo_department_sales"/>
+            <field name="parent_id" ref="demo_employee_manager"/>
+            <field name="job_title">Field Sales Representative</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="mobile_phone">+855 12 800 002</field>
+        </record>
+
+        <record id="demo_employee_rep2" model="hr.employee">
+            <field name="name">Chan Sopheap</field>
+            <field name="user_id" ref="demo_user_rep2"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="department_id" ref="demo_department_sales"/>
+            <field name="parent_id" ref="demo_employee_manager"/>
+            <field name="job_title">Field Sales Representative</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="mobile_phone">+855 12 800 003</field>
+        </record>
+
+        <record id="demo_employee_rep3" model="hr.employee">
+            <field name="name">Kim Vanna</field>
+            <field name="user_id" ref="demo_user_rep3"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="department_id" ref="demo_department_sales"/>
+            <field name="parent_id" ref="demo_employee_manager"/>
+            <field name="job_title">Field Sales Representative</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+            <field name="mobile_phone">+855 12 800 004</field>
+        </record>
+
+        <!-- ============================================================
+             Customers (Phnom Penh, geolocated except the last one)
+             ============================================================ -->
+        <record id="demo_partner_1" model="res.partner">
+            <field name="name">Angkor Mart Supermarket</field>
+            <field name="is_company" eval="True"/>
+            <field name="customer_rank">1</field>
+            <field name="street">No. 45, Street 289</field>
+            <field name="street2">Sangkat Boeung Kak 1, Khan Toul Kork</field>
+            <field name="city">Phnom Penh</field>
+            <field name="zip">120408</field>
+            <field name="country_id" ref="base.kh"/>
+            <field name="phone">+855 23 880 101</field>
+            <field name="email">purchasing@angkormart.example.com</field>
+            <field name="partner_latitude">11.5772000</field>
+            <field name="partner_longitude">104.8935000</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+        </record>
+
+        <record id="demo_partner_2" model="res.partner">
+            <field name="name">Mekong Coffee Roasters</field>
+            <field name="is_company" eval="True"/>
+            <field name="customer_rank">1</field>
+            <field name="street">No. 128, Sisowath Quay</field>
+            <field name="street2">Sangkat Phsar Kandal I, Khan Daun Penh</field>
+            <field name="city">Phnom Penh</field>
+            <field name="zip">120207</field>
+            <field name="country_id" ref="base.kh"/>
+            <field name="phone">+855 23 880 102</field>
+            <field name="mobile">+855 12 900 102</field>
+            <field name="email">hello@mekongcoffee.example.com</field>
+            <field name="partner_latitude">11.5738000</field>
+            <field name="partner_longitude">104.9282000</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+        </record>
+
+        <record id="demo_partner_3" model="res.partner">
+            <field name="name">Sovanna Pharmacy</field>
+            <field name="is_company" eval="True"/>
+            <field name="customer_rank">1</field>
+            <field name="street">No. 210, Norodom Boulevard</field>
+            <field name="street2">Sangkat Boeung Keng Kang 1, Khan Boeung Keng Kang</field>
+            <field name="city">Phnom Penh</field>
+            <field name="zip">120102</field>
+            <field name="country_id" ref="base.kh"/>
+            <field name="phone">+855 23 880 103</field>
+            <field name="email">order@sovannapharma.example.com</field>
+            <field name="partner_latitude">11.5536000</field>
+            <field name="partner_longitude">104.9214000</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+        </record>
+
+        <record id="demo_partner_4" model="res.partner">
+            <field name="name">Bayon Construction Supply</field>
+            <field name="is_company" eval="True"/>
+            <field name="customer_rank">1</field>
+            <field name="street">No. 12, Russian Federation Boulevard</field>
+            <field name="street2">Sangkat Toek Thla, Khan Sen Sok</field>
+            <field name="city">Phnom Penh</field>
+            <field name="zip">120601</field>
+            <field name="country_id" ref="base.kh"/>
+            <field name="phone">+855 23 880 104</field>
+            <field name="mobile">+855 12 900 104</field>
+            <field name="email">procurement@bayonsupply.example.com</field>
+            <field name="partner_latitude">11.5695000</field>
+            <field name="partner_longitude">104.8842000</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+        </record>
+
+        <record id="demo_partner_5" model="res.partner">
+            <field name="name">Khmer Fresh Foods Co., Ltd.</field>
+            <field name="is_company" eval="True"/>
+            <field name="customer_rank">1</field>
+            <field name="street">No. 77, Street 63</field>
+            <field name="street2">Sangkat Boeung Keng Kang 1, Khan Boeung Keng Kang</field>
+            <field name="city">Phnom Penh</field>
+            <field name="zip">120102</field>
+            <field name="country_id" ref="base.kh"/>
+            <field name="phone">+855 23 880 105</field>
+            <field name="email">supply@khmerfreshfoods.example.com</field>
+            <field name="partner_latitude">11.5608000</field>
+            <field name="partner_longitude">104.9188000</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+        </record>
+
+        <!-- Not geolocated yet: check-ins here get the "Customer Not Geolocated" status -->
+        <record id="demo_partner_6" model="res.partner">
+            <field name="name">Chamkarmon Electronics</field>
+            <field name="is_company" eval="True"/>
+            <field name="customer_rank">1</field>
+            <field name="street">No. 302, Mao Tse Toung Boulevard</field>
+            <field name="street2">Sangkat Toul Svay Prey 1, Khan Chamkarmon</field>
+            <field name="city">Phnom Penh</field>
+            <field name="zip">120307</field>
+            <field name="country_id" ref="base.kh"/>
+            <field name="phone">+855 23 880 106</field>
+            <field name="mobile">+855 12 900 106</field>
+            <field name="email">sales@chamkarmonelec.example.com</field>
+            <field name="tz">Asia/Phnom_Penh</field>
+        </record>
+
+        <!-- ============================================================
+             Check-ins (times are UTC; Phnom Penh is UTC+7, so 02:00 UTC = 09:00 local)
+             Non-draft check-ins always carry GPS coordinates (GPS is required by default).
+             ============================================================ -->
+
+        <!-- 9 days ago: Sok Dara at Angkor Mart (verified, ~45 m) -->
+        <record id="demo_checkin_1" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep1"/>
+            <field name="partner_id" ref="demo_partner_1"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Present the Q4 promotion</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=9)).replace(hour=2, minute=15, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=9)).replace(hour=3, minute=5, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5775000</field>
+            <field name="longitude">104.8938000</field>
+            <field name="accuracy">12</field>
+            <field name="checkout_latitude">11.5774000</field>
+            <field name="checkout_longitude">104.8937000</field>
+            <field name="checkout_accuracy">15</field>
+            <field name="outcome">interested</field>
+            <field name="notes">Presented the new Q4 promotion. The store manager is interested in the 24-pack bundle and will confirm quantities next week.</field>
+        </record>
+
+        <!-- 9 days ago: Chan Sopheap at Sovanna Pharmacy (verified, order taken) -->
+        <record id="demo_checkin_2" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep2"/>
+            <field name="partner_id" ref="demo_partner_3"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_meeting"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Quarterly review meeting</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=9)).replace(hour=3, minute=30, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=9)).replace(hour=4, minute=20, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5538000</field>
+            <field name="longitude">104.9216000</field>
+            <field name="accuracy">9</field>
+            <field name="checkout_latitude">11.5537000</field>
+            <field name="checkout_longitude">104.9215000</field>
+            <field name="checkout_accuracy">11</field>
+            <field name="outcome">order</field>
+            <field name="sale_amount">1250.00</field>
+            <field name="notes">Signed an order for 40 cartons of vitamin C. Delivery agreed for next Tuesday morning.</field>
+        </record>
+
+        <!-- 8 days ago: Kim Vanna demo at Bayon Construction Supply (verified, follow-up needed) -->
+        <record id="demo_checkin_3" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep3"/>
+            <field name="partner_id" ref="demo_partner_4"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_demo"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Product demo: mixer range</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=8)).replace(hour=1, minute=45, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=8)).replace(hour=3, minute=10, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5697000</field>
+            <field name="longitude">104.8845000</field>
+            <field name="accuracy">18</field>
+            <field name="checkout_latitude">11.5696000</field>
+            <field name="checkout_longitude">104.8844000</field>
+            <field name="checkout_accuracy">14</field>
+            <field name="outcome">follow_up</field>
+            <field name="next_action_date" eval="(DateTime.now() - timedelta(days=3)).strftime('%Y-%m-%d')"/>
+            <field name="notes">Demonstrated the new cement mixer range. The purchasing manager wants a formal quotation before deciding.</field>
+        </record>
+
+        <!-- 7 days ago: Sok Dara at Mekong Coffee Roasters, but checked in about 3 km away (far) -->
+        <record id="demo_checkin_4" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep1"/>
+            <field name="partner_id" ref="demo_partner_2"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Follow-up on the new price list</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=7)).replace(hour=7, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=7)).replace(hour=7, minute=15, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5468000</field>
+            <field name="longitude">104.9290000</field>
+            <field name="accuracy">25</field>
+            <field name="checkout_latitude">11.5469000</field>
+            <field name="checkout_longitude">104.9291000</field>
+            <field name="checkout_accuracy">22</field>
+            <field name="outcome">not_available</field>
+            <field name="notes">The owner was not at the shop. Called him and rescheduled the visit for next week.</field>
+        </record>
+
+        <!-- 6 days ago: Chan Sopheap at Khmer Fresh Foods (verified, big reorder) -->
+        <record id="demo_checkin_5" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep2"/>
+            <field name="partner_id" ref="demo_partner_5"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Monthly reorder</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=6)).replace(hour=6, minute=30, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=6)).replace(hour=7, minute=45, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5610000</field>
+            <field name="longitude">104.9190000</field>
+            <field name="accuracy">8</field>
+            <field name="checkout_latitude">11.5609000</field>
+            <field name="checkout_longitude">104.9189000</field>
+            <field name="checkout_accuracy">10</field>
+            <field name="outcome">order</field>
+            <field name="sale_amount">3400.00</field>
+            <field name="notes">Reorder of frozen goods for their 3 outlets. Discussed cold-chain delivery slots (before 8 AM).</field>
+        </record>
+
+        <!-- 5 days ago: Kim Vanna at Chamkarmon Electronics (customer not geolocated) -->
+        <record id="demo_checkin_6" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep3"/>
+            <field name="partner_id" ref="demo_partner_6"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">New account introduction</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=5)).replace(hour=8, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=5)).replace(hour=8, minute=50, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5562000</field>
+            <field name="longitude">104.9178000</field>
+            <field name="accuracy">14</field>
+            <field name="checkout_latitude">11.5561000</field>
+            <field name="checkout_longitude">104.9179000</field>
+            <field name="checkout_accuracy">16</field>
+            <field name="outcome">interested</field>
+            <field name="notes">Store is not geolocated yet; asked the owner to confirm the exact address for our records. Interested in POS accessories.</field>
+        </record>
+
+        <!-- 4 days ago: Sok Dara collects a payment at Sovanna Pharmacy (verified) -->
+        <record id="demo_checkin_7" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep1"/>
+            <field name="partner_id" ref="demo_partner_3"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_collection"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Collect payment</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=4)).replace(hour=2, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=4)).replace(hour=2, minute=35, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5534000</field>
+            <field name="longitude">104.9212000</field>
+            <field name="accuracy">11</field>
+            <field name="checkout_latitude">11.5535000</field>
+            <field name="checkout_longitude">104.9213000</field>
+            <field name="checkout_accuracy">9</field>
+            <field name="outcome">follow_up</field>
+            <field name="next_action_date" eval="(DateTime.now() + timedelta(days=4)).strftime('%Y-%m-%d')"/>
+            <field name="notes">Collected the payment for last month's invoice. The pharmacist asked for samples of the new supplement line.</field>
+        </record>
+
+        <!-- 2 days ago: Kim Vanna meeting at Mekong Coffee Roasters (verified, contract signed) -->
+        <record id="demo_checkin_8" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep3"/>
+            <field name="partner_id" ref="demo_partner_2"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_meeting"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Contract negotiation</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=2)).replace(hour=4, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=2)).replace(hour=5, minute=15, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5740000</field>
+            <field name="longitude">104.9284000</field>
+            <field name="accuracy">10</field>
+            <field name="checkout_latitude">11.5739000</field>
+            <field name="checkout_longitude">104.9283000</field>
+            <field name="checkout_accuracy">12</field>
+            <field name="outcome">order</field>
+            <field name="sale_amount">890.00</field>
+            <field name="notes">Agreed on a 6-month supply contract for espresso cups. First delivery on Friday.</field>
+        </record>
+
+        <!-- Yesterday: Sok Dara delivers at Bayon Construction Supply (verified, re-order) -->
+        <record id="demo_checkin_9" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep1"/>
+            <field name="partner_id" ref="demo_partner_4"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_delivery"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Deliver the mixer order</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=1)).replace(hour=1, minute=30, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=1)).replace(hour=2, minute=20, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5693000</field>
+            <field name="longitude">104.8840000</field>
+            <field name="accuracy">16</field>
+            <field name="checkout_latitude">11.5694000</field>
+            <field name="checkout_longitude">104.8841000</field>
+            <field name="checkout_accuracy">13</field>
+            <field name="outcome">order</field>
+            <field name="sale_amount">2150.00</field>
+            <field name="notes">Delivered the mixer order and took a re-order for accessories (hoses, blades).</field>
+        </record>
+
+        <!-- Yesterday: Chan Sopheap at Angkor Mart (verified, not interested) -->
+        <record id="demo_checkin_10" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep2"/>
+            <field name="partner_id" ref="demo_partner_1"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Introduce the premium range</field>
+            <field name="state">done</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(days=1)).replace(hour=8, minute=15, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="checkout_time" eval="(DateTime.now() - timedelta(days=1)).replace(hour=8, minute=55, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5770000</field>
+            <field name="longitude">104.8933000</field>
+            <field name="accuracy">13</field>
+            <field name="checkout_latitude">11.5771000</field>
+            <field name="checkout_longitude">104.8934000</field>
+            <field name="checkout_accuracy">17</field>
+            <field name="outcome">not_interested</field>
+            <field name="notes">The manager is not interested in the premium range for now; very price sensitive. Keep the standard range.</field>
+        </record>
+
+        <!-- Today: Chan Sopheap currently on site at Khmer Fresh Foods (checked in one hour ago) -->
+        <record id="demo_checkin_11" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep2"/>
+            <field name="partner_id" ref="demo_partner_5"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Weekly stock check</field>
+            <field name="state">checked_in</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(hours=1)).replace(second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5606000</field>
+            <field name="longitude">104.9186000</field>
+            <field name="accuracy">9</field>
+        </record>
+
+        <!-- Today: Kim Vanna currently demoing at Chamkarmon Electronics (customer not geolocated) -->
+        <record id="demo_checkin_12" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep3"/>
+            <field name="partner_id" ref="demo_partner_6"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_demo"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Demo of POS accessories</field>
+            <field name="state">checked_in</field>
+            <field name="checkin_time" eval="(DateTime.now() - timedelta(minutes=30)).replace(second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+            <field name="latitude">11.5559000</field>
+            <field name="longitude">104.9181000</field>
+            <field name="accuracy">20</field>
+        </record>
+
+        <!-- Planned visits (no GPS yet) -->
+        <record id="demo_checkin_13" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep1"/>
+            <field name="partner_id" ref="demo_partner_2"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_visit"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Follow-up on the new price list (rescheduled)</field>
+            <field name="state">draft</field>
+            <field name="checkin_time" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+        </record>
+
+        <record id="demo_checkin_14" model="checkinme.checkin">
+            <field name="employee_id" ref="demo_employee_rep2"/>
+            <field name="partner_id" ref="demo_partner_6"/>
+            <field name="checkin_type_id" ref="checkinme_sales_activity.activity_type_meeting"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="purpose">Present the cold-chain delivery plan</field>
+            <field name="state">draft</field>
+            <field name="checkin_time" eval="(DateTime.now() + timedelta(days=2)).replace(hour=7, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')"/>
+        </record>
+
+        <!-- ============================================================
+             Monthly targets (KPI) for the current month
+             ============================================================ -->
+        <record id="demo_target_1" model="checkinme.target">
+            <field name="employee_id" ref="demo_employee_rep1"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="year" eval="DateTime.now().year"/>
+            <field name="month" eval="str(DateTime.now().month)"/>
+            <field name="target_visits">40</field>
+            <field name="target_new_customers">4</field>
+            <field name="target_orders">10</field>
+            <field name="target_sales_amount">12000.00</field>
+            <field name="note">Focus on Toul Kork and Sen Sok districts.</field>
+        </record>
+
+        <record id="demo_target_2" model="checkinme.target">
+            <field name="employee_id" ref="demo_employee_rep2"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="year" eval="DateTime.now().year"/>
+            <field name="month" eval="str(DateTime.now().month)"/>
+            <field name="target_visits">45</field>
+            <field name="target_new_customers">5</field>
+            <field name="target_orders">12</field>
+            <field name="target_sales_amount">15000.00</field>
+            <field name="note">Key accounts: supermarkets and food distributors.</field>
+        </record>
+
+        <record id="demo_target_3" model="checkinme.target">
+            <field name="employee_id" ref="demo_employee_rep3"/>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="year" eval="DateTime.now().year"/>
+            <field name="month" eval="str(DateTime.now().month)"/>
+            <field name="target_visits">35</field>
+            <field name="target_new_customers">6</field>
+            <field name="target_orders">8</field>
+            <field name="target_sales_amount">9000.00</field>
+            <field name="note">Prospecting new electronics and construction accounts.</field>
+        </record>
+
+    </data>
+</odoo>

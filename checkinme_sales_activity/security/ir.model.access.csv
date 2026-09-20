@@ -1,7 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_checkinme_activity_type_user,checkinme.activity.type user,model_checkinme_activity_type,group_checkinme_user,1,0,0,0
 access_checkinme_activity_type_manager,checkinme.activity.type manager,model_checkinme_activity_type,group_checkinme_manager,1,1,1,1
-access_checkinme_checkin_user,checkinme.checkin user,model_checkinme_checkin,group_checkinme_user,1,1,1,0
+access_checkinme_checkin_user,checkinme.checkin user,model_checkinme_checkin,group_checkinme_user,1,1,1,1
 access_checkinme_checkin_manager,checkinme.checkin manager,model_checkinme_checkin,group_checkinme_manager,1,1,1,1
 access_checkinme_target_user,checkinme.target user,model_checkinme_target,group_checkinme_user,1,0,0,0
 access_checkinme_target_manager,checkinme.target manager,model_checkinme_target,group_checkinme_manager,1,1,1,1

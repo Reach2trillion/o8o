@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================
+         Sales Activity Report (PDF) - printed from checkinme.report.wizard
+         Rendering values come from report/checkinme_activity_report.py:
+           summary (dict), period_label, include_details, company, docs
+         ================================================================ -->
+    <template id="report_checkinme_activity">
+        <t t-call="web.html_container">
+            <!-- docs are transient wizard records; the layout takes the company from 'company' -->
+            <t t-set="o" t-value="docs[0] if docs else None"/>
+            <t t-set="totals" t-value="summary['totals']"/>
+            <t t-set="outcome_labels" t-value="dict(env['checkinme.checkin'].fields_get(['outcome'])['outcome']['selection'])"/>
+            <t t-set="target_status_labels" t-value="dict(env['checkinme.target'].fields_get(['status'])['status']['selection'])"/>
+            <t t-call="web.external_layout">
+                <div class="page">
+
+                    <!-- Title -->
+                    <h2 class="mb-1">Sales Activity Report</h2>
+                    <p class="text-muted mb-4">
+                        <span t-out="period_label"/>
+                        <t t-if="company"> &#183; <span t-out="company.name"/></t>
+                    </p>
+
+                    <!-- Totals -->
+                    <h4>Summary</h4>
+                    <table class="table table-sm table-bordered text-center mb-2">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Salespeople</th>
+                                <th>Visits (Verified)</th>
+                                <th>Customers</th>
+                                <th>New Customers</th>
+                                <th>Orders</th>
+                                <th>Sales Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="fs-5">
+                                <td t-out="totals['employees']"/>
+                                <td><t t-out="totals['visits']"/> (<t t-out="totals['verified']"/>)</td>
+                                <td t-out="totals['customers']"/>
+                                <td t-out="totals['new_customers']"/>
+                                <td t-out="totals['orders']"/>
+                                <td>
+                                    <span t-out="totals['sales_amount']"
+                                          t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p t-if="totals['target_sales_amount']" class="small mb-4">
+                        <strong>Team sales target:</strong>
+                        <span t-out="totals['sales_amount']"
+                              t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                        /
+                        <span t-out="totals['target_sales_amount']"
+                              t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                        (<t t-out="'%.0f' % (100.0 * totals['sales_amount'] / totals['target_sales_amount'])"/>%)
+                        <t t-if="totals['target_visits']">
+                            &#183; <strong>Team visits target:</strong>
+                            <t t-out="totals['visits']"/> / <t t-out="totals['target_visits']"/>
+                            (<t t-out="'%.0f' % (100.0 * totals['visits'] / totals['target_visits'])"/>%)
+                        </t>
+                    </p>
+
+                    <!-- Per employee -->
+                    <h4 class="mt-3">Results per Salesperson</h4>
+                    <t t-if="not summary['employees']">
+                        <p class="text-muted fst-italic">No activity recorded for this period.</p>
+                    </t>
+                    <table t-else="" class="table table-sm table-bordered" style="font-size: 11px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Salesperson</th>
+                                <th class="text-end">Check-ins</th>
+                                <th class="text-end">Visits</th>
+                                <th class="text-end">Verified</th>
+                                <th class="text-end">Customers</th>
+                                <th class="text-end">New</th>
+                                <th class="text-end">Orders</th>
+                                <th class="text-end">Sales Amount</th>
+                                <th class="text-end">Target Sales</th>
+                                <th class="text-end">Sales %</th>
+                                <th class="text-end">Visits %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="summary['employees']" t-as="row">
+                                <td>
+                                    <span t-out="row['employee'].name"/>
+                                    <span t-if="row.get('target')" class="text-muted">
+                                        (<t t-out="target_status_labels.get(row.get('target_status'), '')"/>)
+                                    </span>
+                                </td>
+                                <td class="text-end" t-out="row['checkins']"/>
+                                <td class="text-end" t-out="row['visits']"/>
+                                <td class="text-end" t-out="row['verified']"/>
+                                <td class="text-end" t-out="row['customers']"/>
+                                <td class="text-end" t-out="row['new_customers']"/>
+                                <td class="text-end" t-out="row['orders']"/>
+                                <td class="text-end">
+                                    <span t-out="row['sales_amount']"
+                                          t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-if="row.get('target')" t-out="row.get('target_sales_amount', 0.0)"
+                                          t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                    <span t-else="" class="text-muted">-</span>
+                                </td>
+                                <td class="text-end">
+                                    <t t-if="row.get('target') and row.get('target_sales_amount')">
+                                        <t t-out="'%.0f' % row.get('achievement_sales', 0.0)"/>%
+                                    </t>
+                                    <span t-else="" class="text-muted">-</span>
+                                </td>
+                                <td class="text-end">
+                                    <t t-if="row.get('target') and row.get('target_visits')">
+                                        <t t-out="'%.0f' % row.get('achievement_visits', 0.0)"/>%
+                                    </t>
+                                    <span t-else="" class="text-muted">-</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold table-light">
+                                <td>Total</td>
+                                <td class="text-end" t-out="totals['checkins']"/>
+                                <td class="text-end" t-out="totals['visits']"/>
+                                <td class="text-end" t-out="totals['verified']"/>
+                                <td class="text-end" t-out="totals['customers']"/>
+                                <td class="text-end" t-out="totals['new_customers']"/>
+                                <td class="text-end" t-out="totals['orders']"/>
+                                <td class="text-end">
+                                    <span t-out="totals['sales_amount']"
+                                          t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-if="totals['target_sales_amount']" t-out="totals['target_sales_amount']"
+                                          t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                    <span t-else="" class="text-muted">-</span>
+                                </td>
+                                <td class="text-end">
+                                    <t t-if="totals['target_sales_amount']">
+                                        <t t-out="'%.0f' % (100.0 * totals['sales_amount'] / totals['target_sales_amount'])"/>%
+                                    </t>
+                                    <span t-else="" class="text-muted">-</span>
+                                </td>
+                                <td class="text-end">
+                                    <t t-if="totals['target_visits']">
+                                        <t t-out="'%.0f' % (100.0 * totals['visits'] / totals['target_visits'])"/>%
+                                    </t>
+                                    <span t-else="" class="text-muted">-</span>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <p class="text-muted small">
+                        <t t-if="summary['sales_source'] == 'checkin'">
+                            Sales figures are the amounts entered on check-ins; a check-in with outcome "Order Taken" counts as an order.
+                        </t>
+                        <t t-else="">
+                            Sales figures are the confirmed sales orders of each salesperson in the period (untaxed, company currency).
+                        </t>
+                        Visits are check-ins whose activity type counts as a field visit; "Verified" visits were checked in
+                        within the configured distance of the customer's geolocation. Target percentages refer to the monthly
+                        target of the salesperson and are only shown when the period lies within a single month.
+                    </p>
+
+                    <!-- Details -->
+                    <t t-if="include_details and summary['employees']">
+                        <h4 class="mt-4">Check-in Details</h4>
+                        <t t-foreach="summary['employees']" t-as="row">
+                            <div class="mt-3">
+                                <h5 class="mb-1" t-out="row['employee'].name"/>
+                                <p class="text-muted small mb-1">
+                                    <t t-out="row['checkins']"/> check-ins &#183;
+                                    <t t-out="row['visits']"/> visits (<t t-out="row['verified']"/> verified) &#183;
+                                    <t t-out="row['customers']"/> customers (<t t-out="row['new_customers']"/> new) &#183;
+                                    <t t-out="'%.1f' % row['duration']"/> h on site
+                                    <t t-if="row['by_type']">
+                                        &#183; Types:
+                                        <t t-foreach="row['by_type']" t-as="item"><t t-out="item[0]"/> (<t t-out="item[1]"/>)<t t-if="not item_last">, </t></t>
+                                    </t>
+                                    <t t-if="row['by_outcome']">
+                                        &#183; Outcomes:
+                                        <t t-foreach="row['by_outcome']" t-as="code"><t t-out="outcome_labels.get(code, code)"/> (<t t-out="code_value"/>)<t t-if="not code_last">, </t></t>
+                                    </t>
+                                </p>
+                                <p t-if="row.get('target')" class="small mb-2">
+                                    <strong>Monthly target:</strong>
+                                    <t t-if="row.get('target_sales_amount')">
+                                        Sales
+                                        <span t-out="row['sales_amount']"
+                                              t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                        /
+                                        <span t-out="row['target_sales_amount']"
+                                              t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                        (<t t-out="'%.0f' % row['achievement_sales']"/>%)
+                                    </t>
+                                    <t t-if="row.get('target_visits')">
+                                        &#183; Visits <t t-out="row['visits']"/> / <t t-out="row['target_visits']"/>
+                                        (<t t-out="'%.0f' % row['achievement_visits']"/>%)
+                                    </t>
+                                    <t t-if="row.get('target_new_customers')">
+                                        &#183; New customers <t t-out="row['new_customers']"/> / <t t-out="row['target_new_customers']"/>
+                                        (<t t-out="'%.0f' % row['achievement_new_customers']"/>%)
+                                    </t>
+                                    <t t-if="row.get('target_orders')">
+                                        &#183; Orders <t t-out="row['orders']"/> / <t t-out="row['target_orders']"/>
+                                        (<t t-out="'%.0f' % row['achievement_orders']"/>%)
+                                    </t>
+                                    &#183; Overall <t t-out="'%.0f' % row['achievement_rate']"/>%
+                                    &#183; <t t-out="target_status_labels.get(row.get('target_status'), '')"/>
+                                </p>
+                                <table t-if="row['checkin_records']" class="table table-sm table-bordered" style="font-size: 10px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date / Time</th>
+                                            <th>Customer</th>
+                                            <th>Type</th>
+                                            <th>Location Check</th>
+                                            <th class="text-end">Distance (m)</th>
+                                            <th>Outcome</th>
+                                            <th class="text-end">Sales Amount</th>
+                                            <th>Map</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="row['checkin_records']" t-as="checkin">
+                                            <td><span t-out="checkin.get_local_datetime_str()"/></td>
+                                            <td><span t-out="checkin.partner_id.display_name or '-'"/></td>
+                                            <td><span t-out="checkin.checkin_type_id.name"/></td>
+                                            <td><span t-field="checkin.location_status"/></td>
+                                            <td class="text-end">
+                                                <t t-if="checkin.location_status in ('verified', 'far')">
+                                                    <t t-out="'%d' % round(checkin.distance_to_partner)"/>
+                                                </t>
+                                                <span t-else="" class="text-muted">-</span>
+                                            </td>
+                                            <td>
+                                                <span t-if="checkin.outcome" t-field="checkin.outcome"/>
+                                                <span t-else="" class="text-muted">-</span>
+                                            </td>
+                                            <td class="text-end">
+                                                <span t-out="checkin.sale_amount"
+                                                      t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
+                                            </td>
+                                            <td>
+                                                <a t-if="checkin.google_maps_url" t-att-href="checkin.google_maps_url">Map</a>
+                                                <span t-else="" class="text-muted">-</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p t-else="" class="text-muted small fst-italic">No check-ins in this period.</p>
+                            </div>
+                        </t>
+                    </t>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <!-- ================================================================
+         Visit Sheet (PDF) - one page per check-in (checkinme.checkin)
+         ================================================================ -->
+    <template id="report_checkinme_checkin">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <div class="d-flex justify-content-between align-items-end mb-3">
+                            <h2 class="mb-0">Visit Sheet <span t-field="doc.name"/></h2>
+                            <span class="badge text-bg-secondary fs-6" t-field="doc.state"/>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <strong>Salesperson</strong>
+                                <div t-out="doc.employee_id.name"/>
+                                <div t-if="doc.employee_id.job_title" class="text-muted small" t-out="doc.employee_id.job_title"/>
+                                <div class="mt-2"><strong>Activity Type</strong></div>
+                                <div t-out="doc.checkin_type_id.name"/>
+                                <t t-if="doc.purpose">
+                                    <div class="mt-2"><strong>Purpose</strong></div>
+                                    <div t-out="doc.purpose"/>
+                                </t>
+                            </div>
+                            <div class="col-6">
+                                <strong>Customer</strong>
+                                <t t-if="doc.partner_id">
+                                    <div t-field="doc.partner_id"
+                                         t-options='{"widget": "contact", "fields": ["name", "address", "phone", "mobile"], "no_marker": True}'/>
+                                    <div t-if="doc.is_new_customer" class="text-success small">New customer (first visit)</div>
+                                </t>
+                                <div t-else="" class="text-muted">-</div>
+                            </div>
+                        </div>
+
+                        <h4 class="mt-3">Time</h4>
+                        <table class="table table-sm table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 30%;">Check-in</th>
+                                    <td><span t-out="doc.get_local_datetime_str('checkin_time')"/></td>
+                                </tr>
+                                <tr>
+                                    <th>Check-out</th>
+                                    <td>
+                                        <span t-if="doc.checkout_time" t-out="doc.get_local_datetime_str('checkout_time')"/>
+                                        <span t-else="" class="text-muted">-</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Duration</th>
+                                    <td>
+                                        <t t-if="doc.duration">
+                                            <span t-field="doc.duration" t-options="{'widget': 'float_time'}"/> (hh:mm)
+                                        </t>
+                                        <span t-else="" class="text-muted">-</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 class="mt-3">GPS Location</h4>
+                        <table class="table table-sm table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 30%;">Check-in Position</th>
+                                    <td>
+                                        <t t-if="doc.has_location">
+                                            <span t-out="'%.6f, %.6f' % (doc.latitude, doc.longitude)"/>
+                                            <span t-if="doc.accuracy" class="text-muted">
+                                                (accuracy &#177;<t t-out="'%d' % round(doc.accuracy)"/> m)
+                                            </span>
+                                            <br/>
+                                            <a t-att-href="doc.google_maps_url" t-out="doc.google_maps_url"/>
+                                        </t>
+                                        <span t-else="" class="text-muted">No GPS position captured</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Location Check</th>
+                                    <td>
+                                        <span t-field="doc.location_status"/>
+                                        <t t-if="doc.location_status in ('verified', 'far')">
+                                            &#183;
+                                            <t t-if="doc.distance_to_partner >= 1000">
+                                                <t t-out="'%.1f km' % (doc.distance_to_partner / 1000.0)"/>
+                                            </t>
+                                            <t t-else="">
+                                                <t t-out="'%d m' % round(doc.distance_to_partner)"/>
+                                            </t>
+                                            from the customer's location
+                                        </t>
+                                    </td>
+                                </tr>
+                                <tr t-if="doc.checkout_latitude or doc.checkout_longitude">
+                                    <th>Check-out Position</th>
+                                    <td>
+                                        <span t-out="'%.6f, %.6f' % (doc.checkout_latitude, doc.checkout_longitude)"/>
+                                        <span t-if="doc.checkout_accuracy" class="text-muted">
+                                            (accuracy &#177;<t t-out="'%d' % round(doc.checkout_accuracy)"/> m)
+                                        </span>
+                                        <br/>
+                                        <a t-if="doc.checkout_google_maps_url" t-att-href="doc.checkout_google_maps_url"
+                                           t-out="doc.checkout_google_maps_url"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 class="mt-3">Outcome</h4>
+                        <table class="table table-sm table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 30%;">Outcome</th>
+                                    <td>
+                                        <span t-if="doc.outcome" t-field="doc.outcome"/>
+                                        <span t-else="" class="text-muted">-</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Follow-up Date</th>
+                                    <td>
+                                        <span t-if="doc.next_action_date" t-field="doc.next_action_date"/>
+                                        <span t-else="" class="text-muted">-</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Sales Amount</th>
+                                    <td>
+                                        <span t-field="doc.sale_amount"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                    </td>
+                                </tr>
+                                <tr t-if="doc.sale_order_count">
+                                    <th>Sales Orders</th>
+                                    <td>
+                                        <t t-out="doc.sale_order_count"/> order(s),
+                                        <span t-field="doc.order_amount"
+                                              t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                        confirmed
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <t t-if="doc.notes">
+                            <h4 class="mt-3">Meeting Notes</h4>
+                            <div class="border rounded p-2" t-field="doc.notes"/>
+                        </t>
+
+                        <t t-if="doc.photo">
+                            <h4 class="mt-3">Photo</h4>
+                            <img t-if="doc.photo" t-att-src="image_data_uri(doc.photo)" style="max-height: 300px"
+                                 alt="Check-in photo"/>
+                        </t>
+
+                        <div class="row mt-5">
+                            <div class="col-6">
+                                <div class="border-top pt-1 text-muted small">Salesperson signature</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border-top pt-1 text-muted small">Customer signature</div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

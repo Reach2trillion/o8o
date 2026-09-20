@@ -64,7 +64,7 @@ class CheckinmeReportWizard(models.TransientModel):
     def action_print_pdf(self):
         self.ensure_one()
         return self.env.ref('checkinme_sales_activity.action_report_checkinme_activity').report_action(
-            self, data=self._get_report_data())
+            self, data=self._get_report_data(), config=False)
 
     def action_send_telegram(self):
         self.ensure_one()
