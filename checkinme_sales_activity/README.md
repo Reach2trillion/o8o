@@ -27,6 +27,8 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
 
 ## Configuration (Settings > CheckinMe)
 
+Like every Odoo settings page, this one is only available to users with *Administration > Settings* rights (the CheckinMe **Manager** group alone is not enough to open Settings).
+
 ### Telegram
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the **bot token**.

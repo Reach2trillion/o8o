@@ -78,6 +78,6 @@
               name="Settings"
               parent="menu_checkinme_config"
               action="action_checkinme_config_settings"
-              sequence="20"/>
+              sequence="20" groups="base.group_system"/>
 
 </odoo>
