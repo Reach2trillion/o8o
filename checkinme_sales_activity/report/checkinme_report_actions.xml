@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Sales Activity Report (PDF) printed from the report wizard: no menu binding -->
+    <record id="action_report_checkinme_activity" model="ir.actions.report">
+        <field name="name">Sales Activity Report</field>
+        <field name="model">checkinme.report.wizard</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">checkinme_sales_activity.report_checkinme_activity</field>
+        <field name="report_file">checkinme_sales_activity.report_checkinme_activity</field>
+        <field name="print_report_name">'Sales Activity Report'</field>
+    </record>
+
+    <!-- Visit Sheet (PDF): available in the Print menu of check-ins -->
+    <record id="action_report_checkinme_checkin" model="ir.actions.report">
+        <field name="name">Visit Sheet</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">checkinme_sales_activity.report_checkinme_checkin</field>
+        <field name="report_file">checkinme_sales_activity.report_checkinme_checkin</field>
+        <field name="print_report_name">'Visit - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_checkinme_checkin"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>
