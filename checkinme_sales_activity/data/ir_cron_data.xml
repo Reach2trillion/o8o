@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Daily report: every day at 11:00 UTC (18:00 Asia/Phnom_Penh). Adjust "Next Execution Date" as needed. -->
+        <record id="ir_cron_checkinme_daily_report" model="ir.cron">
+            <field name="name">CheckinMe: Daily Telegram Activity Report</field>
+            <field name="model_id" ref="model_checkinme_telegram"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_daily_report()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).strftime('%Y-%m-%d 11:00:00')"/>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+
+        <!-- Weekly report: every Monday at 02:00 UTC (09:00 Asia/Phnom_Penh) for the previous week. -->
+        <record id="ir_cron_checkinme_weekly_report" model="ir.cron">
+            <field name="name">CheckinMe: Weekly Telegram Activity Report</field>
+            <field name="model_id" ref="model_checkinme_telegram"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_weekly_report()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">weeks</field>
+            <field name="nextcall" eval="(DateTime.now() + relativedelta(days=1, weekday=0)).strftime('%Y-%m-%d 02:00:00')"/>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+
+        <!-- Monthly report: 1st of every month at 02:00 UTC for the previous month. -->
+        <record id="ir_cron_checkinme_monthly_report" model="ir.cron">
+            <field name="name">CheckinMe: Monthly Telegram Activity Report</field>
+            <field name="model_id" ref="model_checkinme_telegram"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_monthly_report()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">months</field>
+            <field name="nextcall" eval="(DateTime.now() + relativedelta(months=1, day=1)).strftime('%Y-%m-%d 02:00:00')"/>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+    </data>
+</odoo>

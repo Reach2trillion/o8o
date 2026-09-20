@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="activity_type_visit" model="checkinme.activity.type">
+            <field name="name">Customer Visit</field>
+            <field name="code">VISIT</field>
+            <field name="sequence">10</field>
+            <field name="color">4</field>
+            <field name="icon">fa-map-marker</field>
+            <field name="counts_as_visit" eval="True"/>
+            <field name="requires_customer" eval="True"/>
+        </record>
+        <record id="activity_type_meeting" model="checkinme.activity.type">
+            <field name="name">Meeting</field>
+            <field name="code">MEET</field>
+            <field name="sequence">20</field>
+            <field name="color">6</field>
+            <field name="icon">fa-handshake-o</field>
+            <field name="counts_as_visit" eval="True"/>
+            <field name="requires_customer" eval="True"/>
+        </record>
+        <record id="activity_type_demo" model="checkinme.activity.type">
+            <field name="name">Product Demo</field>
+            <field name="code">DEMO</field>
+            <field name="sequence">30</field>
+            <field name="color">5</field>
+            <field name="icon">fa-cube</field>
+            <field name="counts_as_visit" eval="True"/>
+            <field name="requires_customer" eval="True"/>
+        </record>
+        <record id="activity_type_prospecting" model="checkinme.activity.type">
+            <field name="name">Prospecting (New Customer)</field>
+            <field name="code">PROSPECT</field>
+            <field name="sequence">40</field>
+            <field name="color">10</field>
+            <field name="icon">fa-search</field>
+            <field name="counts_as_visit" eval="True"/>
+            <field name="requires_customer" eval="False"/>
+        </record>
+        <record id="activity_type_delivery" model="checkinme.activity.type">
+            <field name="name">Delivery</field>
+            <field name="code">DELIV</field>
+            <field name="sequence">50</field>
+            <field name="color">2</field>
+            <field name="icon">fa-truck</field>
+            <field name="counts_as_visit" eval="True"/>
+            <field name="requires_customer" eval="True"/>
+        </record>
+        <record id="activity_type_collection" model="checkinme.activity.type">
+            <field name="name">Payment Collection</field>
+            <field name="code">COLLECT</field>
+            <field name="sequence">60</field>
+            <field name="color">3</field>
+            <field name="icon">fa-money"/>
+            <field name="counts_as_visit" eval="True"/>
+            <field name="requires_customer" eval="True"/>
+        </record>
+        <record id="activity_type_call" model="checkinme.activity.type">
+            <field name="name">Phone Call</field>
+            <field name="code">CALL</field>
+            <field name="sequence">70</field>
+            <field name="color">7</field>
+            <field name="icon">fa-phone</field>
+            <field name="counts_as_visit" eval="False"/>
+            <field name="requires_customer" eval="True"/>
+        </record>
+        <record id="activity_type_other" model="checkinme.activity.type">
+            <field name="name">Other</field>
+            <field name="code">OTHER</field>
+            <field name="sequence">90</field>
+            <field name="color">0</field>
+            <field name="icon">fa-tag</field>
+            <field name="counts_as_visit" eval="False"/>
+            <field name="requires_customer" eval="False"/>
+        </record>
+    </data>
+</odoo>

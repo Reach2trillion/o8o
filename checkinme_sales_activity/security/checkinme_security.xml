@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_checkinme" model="ir.module.category">
+        <field name="name">CheckinMe Sales Activity</field>
+        <field name="description">Access rights for the CheckinMe Sales Activity application.</field>
+        <field name="sequence">25</field>
+    </record>
+
+    <record id="group_checkinme_user" model="res.groups">
+        <field name="name">Salesperson</field>
+        <field name="category_id" ref="module_category_checkinme"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Can create GPS check-ins for own visits, see own (and direct reports') check-ins, targets and reports.</field>
+    </record>
+
+    <record id="group_checkinme_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_checkinme"/>
+        <field name="implied_ids" eval="[(4, ref('group_checkinme_user'))]"/>
+        <field name="users" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+        <field name="comment">Full access: all check-ins, targets, activity types, Telegram settings and logs.</field>
+    </record>
+
+    <data noupdate="1">
+        <!-- Check-ins -->
+        <record id="checkinme_checkin_rule_user" model="ir.rule">
+            <field name="name">Check-in: own and direct reports</field>
+            <field name="model_id" ref="model_checkinme_checkin"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_user'))]"/>
+        </record>
+        <record id="checkinme_checkin_rule_manager" model="ir.rule">
+            <field name="name">Check-in: manager sees all</field>
+            <field name="model_id" ref="model_checkinme_checkin"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_manager'))]"/>
+        </record>
+        <record id="checkinme_checkin_rule_company" model="ir.rule">
+            <field name="name">Check-in: multi-company</field>
+            <field name="model_id" ref="model_checkinme_checkin"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- Targets -->
+        <record id="checkinme_target_rule_user" model="ir.rule">
+            <field name="name">Target: own and direct reports</field>
+            <field name="model_id" ref="model_checkinme_target"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_user'))]"/>
+        </record>
+        <record id="checkinme_target_rule_manager" model="ir.rule">
+            <field name="name">Target: manager sees all</field>
+            <field name="model_id" ref="model_checkinme_target"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_manager'))]"/>
+        </record>
+        <record id="checkinme_target_rule_company" model="ir.rule">
+            <field name="name">Target: multi-company</field>
+            <field name="model_id" ref="model_checkinme_target"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- Performance report (SQL view) -->
+        <record id="checkinme_performance_report_rule_user" model="ir.rule">
+            <field name="name">Performance report: own and direct reports</field>
+            <field name="model_id" ref="model_checkinme_performance_report"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_user'))]"/>
+        </record>
+        <record id="checkinme_performance_report_rule_manager" model="ir.rule">
+            <field name="name">Performance report: manager sees all</field>
+            <field name="model_id" ref="model_checkinme_performance_report"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_manager'))]"/>
+        </record>
+        <record id="checkinme_performance_report_rule_company" model="ir.rule">
+            <field name="name">Performance report: multi-company</field>
+            <field name="model_id" ref="model_checkinme_performance_report"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+    </data>
+</odoo>
