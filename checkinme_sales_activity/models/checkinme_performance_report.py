@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import fields, models, tools
+from odoo import fields, models
 
 from .checkinme_checkin import CHECKIN_STATES, LOCATION_STATUSES, OUTCOMES
 
@@ -19,7 +19,7 @@ class CheckinmePerformanceReport(models.Model):
     company_id = fields.Many2one('res.company', string='Company', readonly=True)
     currency_id = fields.Many2one('res.currency', string='Currency', readonly=True)
     partner_id = fields.Many2one('res.partner', string='Customer', readonly=True)
-    activity_type_id = fields.Many2one('checkinme.activity.type', string='Activity Type', readonly=True)
+    checkin_type_id = fields.Many2one('checkinme.activity.type', string='Activity Type', readonly=True)
     checkin_id = fields.Many2one('checkinme.checkin', string='Check-in', readonly=True)
     sale_order_id = fields.Many2one('sale.order', string='Sales Order', readonly=True)
     state = fields.Selection(CHECKIN_STATES, string='Check-in Status', readonly=True)
@@ -37,7 +37,9 @@ class CheckinmePerformanceReport(models.Model):
     order_amount = fields.Monetary(
         string='Orders Amount (Untaxed)', currency_field='currency_id', readonly=True, aggregator='sum')
 
-    def _query(self):
+    @property
+    def _table_query(self):
+        """Inlined at search time (no database view), so no dependency on table creation order."""
         return """
             SELECT
                 c.id * 2 AS id,
@@ -48,7 +50,7 @@ class CheckinmePerformanceReport(models.Model):
                 c.company_id AS company_id,
                 comp.currency_id AS currency_id,
                 c.partner_id AS partner_id,
-                c.activity_type_id AS activity_type_id,
+                c.checkin_type_id AS checkin_type_id,
                 c.id AS checkin_id,
                 NULL::integer AS sale_order_id,
                 c.state AS state,
@@ -64,7 +66,7 @@ class CheckinmePerformanceReport(models.Model):
                 0.0 AS order_amount
             FROM checkinme_checkin c
             JOIN res_company comp ON comp.id = c.company_id
-            LEFT JOIN checkinme_activity_type t ON t.id = c.activity_type_id
+            LEFT JOIN checkinme_activity_type t ON t.id = c.checkin_type_id
             WHERE c.state IN ('checked_in', 'done')
 
             UNION ALL
@@ -78,7 +80,7 @@ class CheckinmePerformanceReport(models.Model):
                 so.company_id AS company_id,
                 comp.currency_id AS currency_id,
                 so.partner_id AS partner_id,
-                NULL::integer AS activity_type_id,
+                NULL::integer AS checkin_type_id,
                 so.checkinme_checkin_id AS checkin_id,
                 so.id AS sale_order_id,
                 NULL::varchar AS state,
@@ -99,7 +101,3 @@ class CheckinmePerformanceReport(models.Model):
             LEFT JOIN resource_resource rr ON rr.id = e.resource_id
             WHERE so.state = 'sale' AND so.user_id IS NOT NULL
         """
-
-    def init(self):
-        tools.drop_view_if_exists(self.env.cr, self._table)
-        self.env.cr.execute("CREATE OR REPLACE VIEW %s AS (%s)" % (self._table, self._query()))

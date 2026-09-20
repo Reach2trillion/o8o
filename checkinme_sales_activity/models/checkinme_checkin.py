@@ -85,7 +85,7 @@ class CheckinmeCheckin(models.Model):
         return self.env.user.employee_id
 
     @api.model
-    def _default_activity_type_id(self):
+    def _default_checkin_type_id(self):
         return self.env['checkinme.activity.type'].search([], limit=1)
 
     # ------------------------------------------------------------------
@@ -111,11 +111,11 @@ class CheckinmeCheckin(models.Model):
     partner_address = fields.Char(related='partner_id.contact_address', string='Customer Address')
     partner_latitude = fields.Float(related='partner_id.partner_latitude', string='Customer Latitude')
     partner_longitude = fields.Float(related='partner_id.partner_longitude', string='Customer Longitude')
-    activity_type_id = fields.Many2one(
+    checkin_type_id = fields.Many2one(
         'checkinme.activity.type', string='Activity Type', required=True, index=True, tracking=True,
-        default=_default_activity_type_id, ondelete='restrict')
-    counts_as_visit = fields.Boolean(related='activity_type_id.counts_as_visit', store=True)
-    color = fields.Integer(related='activity_type_id.color')
+        default=_default_checkin_type_id, ondelete='restrict')
+    counts_as_visit = fields.Boolean(related='checkin_type_id.counts_as_visit', store=True)
+    color = fields.Integer(related='checkin_type_id.color')
     purpose = fields.Char(string='Purpose', tracking=True)
     state = fields.Selection(
         CHECKIN_STATES, string='Status', default='checked_in', required=True, index=True,
@@ -273,12 +273,12 @@ class CheckinmeCheckin(models.Model):
             if rec.checkout_time and rec.checkin_time and rec.checkout_time < rec.checkin_time:
                 raise ValidationError(_("The check-out time cannot be earlier than the check-in time."))
 
-    @api.constrains('partner_id', 'activity_type_id', 'state')
+    @api.constrains('partner_id', 'checkin_type_id', 'state')
     def _check_partner_required(self):
         for rec in self:
-            if rec.state != 'cancel' and rec.activity_type_id.requires_customer and not rec.partner_id:
+            if rec.state != 'cancel' and rec.checkin_type_id.requires_customer and not rec.partner_id:
                 raise ValidationError(_(
-                    "A customer is required for activity type '%s'.", rec.activity_type_id.name))
+                    "A customer is required for activity type '%s'.", rec.checkin_type_id.name))
 
     # ------------------------------------------------------------------
     # CRUD
@@ -444,7 +444,8 @@ class CheckinmeCheckin(models.Model):
                 status = _("%(status)s (%(distance)s m from customer)",
                            status=status, distance=int(round(self.distance_to_partner)))
             parts.append(escape(status))
-        self.message_post(body=Markup('<br/>').join(parts), message_type='comment', subtype_xmlid='mail.mt_note')
+        # _message_log: internal note without notifications; works for users without an email address
+        self._message_log(body=Markup('<br/>').join(parts))
 
     def _notify_telegram(self, event, force=False):
         self.ensure_one()
@@ -577,7 +578,7 @@ class CheckinmeCheckin(models.Model):
                 orders = SaleOrder.browse()
                 order_count = len(emp_checkins.filtered(lambda c: c.outcome == 'order'))
                 order_amount = sum(emp_checkins.mapped('sale_amount'))
-            by_type = Counter(c.activity_type_id.name for c in emp_checkins)
+            by_type = Counter(c.checkin_type_id.name for c in emp_checkins)
             by_outcome = Counter(c.outcome for c in emp_checkins if c.outcome)
             row = {
                 'employee': emp,

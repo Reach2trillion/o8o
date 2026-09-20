@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Sales Activity Report wizard                                      -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_report_wizard_form" model="ir.ui.view">
+        <field name="name">checkinme.report.wizard.form</field>
+        <field name="model">checkinme.report.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Sales Activity Report">
+                <group>
+                    <group name="group_period" string="Period">
+                        <field name="period"/>
+                        <field name="date_from" readonly="period != 'custom'"/>
+                        <field name="date_to" readonly="period != 'custom'"/>
+                    </group>
+                    <group name="group_scope" string="Scope">
+                        <field name="employee_ids" widget="many2many_tags"
+                               options="{'no_create': True}" placeholder="All salespeople"/>
+                        <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                        <field name="include_details"/>
+                        <field name="telegram_chat_id" groups="checkinme_sales_activity.group_checkinme_manager"
+                               placeholder="-1001234567890"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_print_pdf" type="object" string="Print PDF"
+                            class="btn-primary" icon="fa-print" data-hotkey="q"/>
+                    <button name="action_view_analysis" type="object" string="Open Analysis"
+                            class="btn-secondary" icon="fa-bar-chart"/>
+                    <button name="action_view_checkins" type="object" string="Open Check-ins"
+                            class="btn-secondary" icon="fa-map-marker"/>
+                    <button name="action_send_telegram" type="object" string="Send to Telegram"
+                            class="btn-secondary" icon="fa-paper-plane"
+                            groups="checkinme_sales_activity.group_checkinme_manager"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_checkinme_report_wizard" model="ir.actions.act_window">
+        <field name="name">Sales Activity Report</field>
+        <field name="res_model">checkinme.report.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_checkinme_report_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

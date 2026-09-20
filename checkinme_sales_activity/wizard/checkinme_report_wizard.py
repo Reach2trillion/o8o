@@ -11,8 +11,8 @@ class CheckinmeReportWizard(models.TransientModel):
 
     period = fields.Selection(
         REPORT_PERIODS + [('custom', 'Custom Range')], string='Period', default='this_month', required=True)
-    date_from = fields.Date(compute='_compute_dates', store=True, readonly=False, required=True)
-    date_to = fields.Date(compute='_compute_dates', store=True, readonly=False, required=True)
+    date_from = fields.Date(compute='_compute_dates', store=True, readonly=False, required=True, precompute=True)
+    date_to = fields.Date(compute='_compute_dates', store=True, readonly=False, required=True, precompute=True)
     employee_ids = fields.Many2many(
         'hr.employee', string='Salespeople', help="Leave empty to include every salesperson.")
     company_id = fields.Many2one(
@@ -22,7 +22,7 @@ class CheckinmeReportWizard(models.TransientModel):
         string='Telegram Chat ID',
         default=lambda self: self.env['checkinme.telegram']._get_default_chat_id())
 
-    @api.depends('period')
+    @api.depends('period', 'company_id')
     def _compute_dates(self):
         Checkin = self.env['checkinme.checkin']
         for wizard in self:

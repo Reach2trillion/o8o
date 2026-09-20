@@ -257,9 +257,10 @@ class CheckinmeTelegram(models.AbstractModel):
         ]
         if checkin.partner_id:
             lines.append("🏢 %s: <b>%s</b>" % (_('Customer'), esc(checkin.partner_id.display_name)))
-            if checkin.partner_address:
-                lines.append("📮 %s" % esc(' '.join(checkin.partner_address.split())))
-        lines.append("🗂 %s: %s" % (_('Type'), esc(checkin.activity_type_id.name)))
+            address = ' '.join((checkin.partner_id._display_address(without_company=True) or '').split())
+            if address:
+                lines.append("📮 %s" % esc(address))
+        lines.append("🗂 %s: %s" % (_('Type'), esc(checkin.checkin_type_id.name)))
         if checkin.purpose:
             lines.append("🎯 %s: %s" % (_('Purpose'), esc(checkin.purpose)))
         if when:

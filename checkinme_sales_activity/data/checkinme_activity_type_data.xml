@@ -51,7 +51,7 @@
             <field name="code">COLLECT</field>
             <field name="sequence">60</field>
             <field name="color">3</field>
-            <field name="icon">fa-money"/>
+            <field name="icon">fa-money</field>
             <field name="counts_as_visit" eval="True"/>
             <field name="requires_customer" eval="True"/>
         </record>

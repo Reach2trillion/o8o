@@ -30,7 +30,7 @@ class CheckinmeActivityType(models.Model):
 
     def _compute_checkin_count(self):
         groups = self.env['checkinme.checkin']._read_group(
-            [('activity_type_id', 'in', self.ids)], ['activity_type_id'], ['__count'])
+            [('checkin_type_id', 'in', self.ids)], ['checkin_type_id'], ['__count'])
         counts = {activity_type.id: count for activity_type, count in groups}
         for rec in self:
             rec.checkin_count = counts.get(rec.id, 0)
@@ -39,6 +39,6 @@ class CheckinmeActivityType(models.Model):
         self.ensure_one()
         action = self.env['ir.actions.act_window']._for_xml_id(
             'checkinme_sales_activity.action_checkinme_checkin')
-        action['domain'] = [('activity_type_id', '=', self.id)]
-        action['context'] = {'default_activity_type_id': self.id}
+        action['domain'] = [('checkin_type_id', '=', self.id)]
+        action['context'] = {'default_checkin_type_id': self.id}
         return action
