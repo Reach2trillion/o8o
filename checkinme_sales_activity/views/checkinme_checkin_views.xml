@@ -46,6 +46,13 @@
                         <label for="name" string="Reference" class="o_form_label"/>
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
+                    <!-- Large touch-friendly actions on phones (header buttons are collapsed in a dropdown on small screens) -->
+                    <div class="o_checkinme_mobile_actions d-md-none d-grid gap-2 mb-3">
+                        <button name="action_check_in" type="object" string="Check In" icon="fa-map-marker"
+                                class="btn btn-primary btn-lg" invisible="state != 'draft'"/>
+                        <button name="action_check_out" type="object" string="Check Out" icon="fa-flag-checkered"
+                                class="btn btn-primary btn-lg" invisible="not id or state != 'checked_in'"/>
+                    </div>
                     <group name="main">
                         <field name="employee_id" widget="many2one_avatar_employee" options="{'no_create': True}"
                                readonly="state in ('done', 'cancel')"/>
