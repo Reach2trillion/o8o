@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================
+         Sales Check-in: Form (mobile-first, single column)
+         ================================================================ -->
+    <record id="view_checkinme_checkin_form" model="ir.ui.view">
+        <field name="name">checkinme.checkin.form</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <form string="Sales Check-in" class="o_checkinme_checkin_form">
+                <header>
+                    <button name="action_check_in" type="object" string="Check In"
+                            class="btn-primary" invisible="state != 'draft'" data-hotkey="q"/>
+                    <button name="action_check_out" type="object" string="Check Out"
+                            class="btn-primary" invisible="state != 'checked_in'" data-hotkey="w"/>
+                    <button name="action_create_quotation" type="object" string="Create Quotation"
+                            invisible="state not in ('checked_in', 'done')"
+                            groups="sales_team.group_sale_salesman"/>
+                    <button name="action_send_telegram" type="object" string="Send to Telegram"
+                            invisible="state not in ('checked_in', 'done')"
+                            groups="checkinme_sales_activity.group_checkinme_manager"/>
+                    <button name="action_cancel" type="object" string="Cancel"
+                            invisible="state not in ('draft', 'checked_in')"
+                            confirm="Are you sure you want to cancel this check-in?"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Planned"
+                            invisible="state != 'cancel'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,checked_in,done"/>
+                </header>
+                <sheet>
+                    <div name="button_box" class="oe_button_box">
+                        <button name="action_view_sale_orders" type="object" class="oe_stat_button"
+                                icon="fa-shopping-cart" groups="sales_team.group_sale_salesman">
+                            <field name="sale_order_count" widget="statinfo" string="Sales Orders"/>
+                        </button>
+                        <button name="action_open_google_maps" type="object" class="oe_stat_button"
+                                icon="fa-map-marker" invisible="not has_location">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_text">Google Maps</span>
+                                <span class="o_stat_text">Open</span>
+                            </div>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Cancelled" bg_color="text-bg-danger" invisible="state != 'cancel'"/>
+                    <div class="oe_title">
+                        <label for="name" string="Reference" class="o_form_label"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group name="main">
+                        <field name="employee_id" widget="many2one_avatar_employee" options="{'no_create': True}"
+                               readonly="state in ('done', 'cancel')"/>
+                        <field name="partner_id"
+                               context="{'show_address': 1, 'default_is_company': True}"
+                               options="{'no_quick_create': True}"
+                               placeholder="Select or create the customer..."/>
+                        <field name="checkin_type_id" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="purpose" placeholder="e.g. Present new price list"/>
+                        <field name="checkin_time"/>
+                        <field name="checkout_time" invisible="state not in ('checked_in', 'done')"/>
+                        <field name="duration" widget="float_time" invisible="state != 'done'"/>
+                        <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                        <field name="user_id" invisible="1"/>
+                        <field name="has_location" invisible="1"/>
+                        <field name="counts_as_visit" invisible="1"/>
+                        <field name="currency_id" invisible="1"/>
+                    </group>
+                    <group string="GPS Location" name="gps_location">
+                        <field name="latitude" widget="checkinme_geolocation"
+                               options="{'longitude_field': 'longitude', 'accuracy_field': 'accuracy', 'auto_capture': True}"
+                               readonly="state in ('done', 'cancel')"/>
+                        <field name="longitude" invisible="1"/>
+                        <field name="accuracy" invisible="1"/>
+                        <field name="location_status" widget="badge"
+                               decoration-success="location_status == 'verified'"
+                               decoration-warning="location_status == 'far'"
+                               decoration-info="location_status == 'unknown'"
+                               decoration-danger="location_status == 'no_gps'"/>
+                        <field name="distance_to_partner" invisible="location_status not in ('verified', 'far')"/>
+                        <field name="google_maps_url" widget="url" readonly="1" invisible="not google_maps_url"/>
+                        <field name="partner_latitude" invisible="1"/>
+                        <field name="partner_longitude" invisible="1"/>
+                    </group>
+                    <group string="Check-out Location" name="checkout_location"
+                           invisible="not id or state not in ('checked_in', 'done')">
+                        <field name="checkout_latitude" widget="checkinme_geolocation"
+                               options="{'longitude_field': 'checkout_longitude', 'accuracy_field': 'checkout_accuracy', 'auto_capture': True, 'auto_capture_on_new': False}"
+                               invisible="not id or state not in ('checked_in', 'done')"
+                               readonly="state in ('done', 'cancel')"/>
+                        <field name="checkout_longitude" invisible="1"/>
+                        <field name="checkout_accuracy" invisible="1"/>
+                        <field name="checkout_google_maps_url" widget="url" readonly="1"
+                               invisible="not checkout_google_maps_url"/>
+                    </group>
+                    <notebook>
+                        <page string="Meeting" name="meeting">
+                            <group>
+                                <field name="notes" placeholder="What was discussed? Customer needs, objections, agreements..."
+                                       nolabel="1" colspan="2"/>
+                                <field name="outcome"/>
+                                <field name="next_action_date"/>
+                                <field name="is_new_customer"/>
+                                <field name="sale_amount" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            </group>
+                        </page>
+                        <page string="Photo" name="photo">
+                            <field name="photo" widget="image" options="{'size': [0, 300]}" nolabel="1"/>
+                        </page>
+                        <page string="Customer" name="customer" invisible="not partner_id">
+                            <group>
+                                <field name="partner_phone" widget="phone"/>
+                                <field name="partner_mobile" widget="phone"/>
+                                <field name="partner_address" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                    <group string="Telegram" name="telegram" groups="checkinme_sales_activity.group_checkinme_manager">
+                        <field name="telegram_notified" readonly="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Sales Check-in: List
+         ================================================================ -->
+    <record id="view_checkinme_checkin_list" model="ir.ui.view">
+        <field name="name">checkinme.checkin.list</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <list string="Sales Check-ins" sample="1" decoration-muted="state == 'cancel'">
+                <header>
+                    <button name="action_recompute_location_status" type="object"
+                            string="Recompute Location Check"
+                            groups="checkinme_sales_activity.group_checkinme_manager"/>
+                </header>
+                <field name="name"/>
+                <field name="checkin_time"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
+                <field name="partner_id"/>
+                <field name="checkin_type_id"/>
+                <field name="location_status" widget="badge"
+                       decoration-success="location_status == 'verified'"
+                       decoration-warning="location_status == 'far'"
+                       decoration-info="location_status == 'unknown'"
+                       decoration-danger="location_status == 'no_gps'"/>
+                <field name="distance_to_partner" optional="hide"/>
+                <field name="duration" optional="hide" widget="float_time"/>
+                <field name="outcome" optional="show"/>
+                <field name="sale_amount" sum="Total" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-info="state == 'checked_in'"
+                       decoration-muted="state == 'draft'"
+                       decoration-danger="state == 'cancel'"/>
+                <field name="telegram_notified" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Sales Check-in: Kanban (mobile cards)
+         ================================================================ -->
+    <record id="view_checkinme_checkin_kanban" model="ir.ui.view">
+        <field name="name">checkinme.checkin.kanban</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile" sample="1" highlight_color="color" quick_create="false"
+                    default_order="checkin_time desc, id desc">
+                <field name="color"/>
+                <field name="currency_id"/>
+                <field name="state"/>
+                <field name="location_status"/>
+                <field name="sale_amount"/>
+                <field name="partner_id"/>
+                <templates>
+                    <t t-name="card" class="o_checkinme_kanban_card">
+                        <div class="d-flex align-items-baseline">
+                            <t t-if="record.partner_id.raw_value">
+                                <field name="partner_id" class="fw-bold fs-5 me-2"/>
+                            </t>
+                            <t t-else="">
+                                <field name="name" class="fw-bold fs-5 me-2"/>
+                            </t>
+                            <field t-if="record.sale_amount.raw_value" name="sale_amount" widget="monetary"
+                                   class="fw-bold ms-auto flex-shrink-0"/>
+                        </div>
+                        <div class="text-muted">
+                            <field name="checkin_type_id"/>
+                            <span class="mx-1">&#183;</span>
+                            <field name="checkin_time"/>
+                        </div>
+                        <div class="d-flex align-items-center mt8">
+                            <field name="employee_id" widget="many2one_avatar_employee"
+                                   options="{'display_avatar_name': True}" readonly="True"/>
+                            <div class="ms-auto d-flex flex-wrap justify-content-end gap-1">
+                                <field name="location_status" widget="badge"
+                                       decoration-success="location_status == 'verified'"
+                                       decoration-warning="location_status == 'far'"
+                                       decoration-info="location_status == 'unknown'"
+                                       decoration-danger="location_status == 'no_gps'"/>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'done'"
+                                       decoration-info="state == 'checked_in'"
+                                       decoration-muted="state == 'draft'"
+                                       decoration-danger="state == 'cancel'"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Sales Check-in: Calendar
+         ================================================================ -->
+    <record id="view_checkinme_checkin_calendar" model="ir.ui.view">
+        <field name="name">checkinme.checkin.calendar</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <!-- date_delay (duration, hours) instead of date_stop: the Odoo 18 calendar model
+                 adds a domain "date_stop >= range start" when date_stop is set (see
+                 web/static/src/views/calendar/calendar_model.js computeRangeDomain), which would
+                 hide every planned visit and every open check-in that has no check-out time yet. -->
+            <calendar string="Sales Check-ins"
+                      date_start="checkin_time"
+                      date_delay="duration"
+                      color="employee_id"
+                      quick_create="0"
+                      event_open_popup="1"
+                      mode="month">
+                <field name="partner_id"/>
+                <field name="employee_id" filters="1" avatar_field="avatar_128"/>
+                <field name="checkin_type_id"/>
+                <field name="location_status"/>
+            </calendar>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Sales Check-in: Pivot / Graph
+         ================================================================ -->
+    <record id="view_checkinme_checkin_pivot" model="ir.ui.view">
+        <field name="name">checkinme.checkin.pivot</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <pivot string="Check-in Analysis" sample="1">
+                <field name="employee_id" type="row"/>
+                <field name="checkin_date" interval="month" type="col"/>
+                <field name="sale_amount" type="measure"/>
+                <field name="duration" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_checkinme_checkin_graph" model="ir.ui.view">
+        <field name="name">checkinme.checkin.graph</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <graph string="Check-in Analysis" type="bar" sample="1">
+                <field name="employee_id"/>
+                <field name="checkin_date" interval="month"/>
+                <field name="sale_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Sales Check-in: Search
+         ================================================================ -->
+    <record id="view_checkinme_checkin_search" model="ir.ui.view">
+        <field name="name">checkinme.checkin.search</field>
+        <field name="model">checkinme.checkin</field>
+        <field name="arch" type="xml">
+            <search string="Search Check-ins">
+                <field name="name" string="Reference"
+                       filter_domain="['|', '|', ('name', 'ilike', self), ('partner_id', 'ilike', self), ('purpose', 'ilike', self)]"/>
+                <field name="partner_id" operator="child_of"/>
+                <field name="employee_id"/>
+                <field name="purpose"/>
+                <field name="notes"/>
+                <field name="checkin_type_id"/>
+                <filter string="My Check-ins" name="filter_my" domain="[('user_id', '=', uid)]"/>
+                <filter string="Today" name="filter_today"
+                        domain="[('checkin_date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <!-- Monday of the current week. PyDate in the web client has no weekday() method,
+                     so the relativedelta(weekday=0) form used by hr_timesheet is used instead. -->
+                <filter string="This Week" name="filter_week"
+                        domain="[('checkin_date', '&gt;=', (context_today() + relativedelta(weeks=-1, days=1, weekday=0)).strftime('%Y-%m-%d'))]"/>
+                <filter string="This Month" name="filter_month"
+                        domain="[('checkin_date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
+                <filter string="This Year" name="filter_year"
+                        domain="[('checkin_date', '&gt;=', context_today().strftime('%Y-01-01'))]"/>
+                <separator/>
+                <filter string="Planned" name="filter_draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Checked In / Out" name="filter_checked" domain="[('state', 'in', ('checked_in', 'done'))]"/>
+                <filter string="Checked In" name="filter_checked_in" domain="[('state', '=', 'checked_in')]"/>
+                <filter string="Checked Out" name="filter_done" domain="[('state', '=', 'done')]"/>
+                <filter string="Cancelled" name="filter_cancel" domain="[('state', '=', 'cancel')]"/>
+                <separator/>
+                <filter string="Verified On Site" name="filter_verified" domain="[('location_status', '=', 'verified')]"/>
+                <filter string="Far From Customer" name="filter_far" domain="[('location_status', '=', 'far')]"/>
+                <filter string="No GPS" name="filter_no_gps" domain="[('location_status', '=', 'no_gps')]"/>
+                <separator/>
+                <filter string="New Customers" name="filter_new_customer" domain="[('is_new_customer', '=', True)]"/>
+                <filter string="Not Sent to Telegram" name="filter_not_notified"
+                        domain="[('telegram_notified', '=', False), ('state', 'in', ('checked_in', 'done'))]"/>
+                <separator/>
+                <filter string="Check-in Date" name="filter_checkin_date" date="checkin_date"/>
+                <group expand="0" string="Group By">
+                    <filter string="Salesperson" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Customer" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Activity Type" name="group_type" context="{'group_by': 'checkin_type_id'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Location Check" name="group_location_status" context="{'group_by': 'location_status'}"/>
+                    <separator/>
+                    <filter string="Day" name="group_date" context="{'group_by': 'checkin_date:day'}"/>
+                    <filter string="Week" name="group_week" context="{'group_by': 'checkin_date:week'}"/>
+                    <filter string="Month" name="group_month" context="{'group_by': 'checkin_date:month'}"/>
+                    <filter string="Year" name="group_year" context="{'group_by': 'checkin_date:year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================
+         Actions
+         ================================================================ -->
+    <record id="action_checkinme_checkin" model="ir.actions.act_window">
+        <field name="name">Check-ins</field>
+        <field name="res_model">checkinme.checkin</field>
+        <field name="view_mode">kanban,list,form,calendar,pivot,graph</field>
+        <field name="search_view_id" ref="view_checkinme_checkin_search"/>
+        <field name="context">{'search_default_filter_my': 1, 'search_default_filter_month': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No check-in yet. Let's record your first customer visit!
+            </p><p>
+                Capture your GPS position when you arrive at the customer, add meeting notes,
+                a photo and the sales result. Managers are notified on Telegram instantly.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_checkinme_checkin_now" model="ir.actions.act_window">
+        <field name="name">Check In Now</field>
+        <field name="res_model">checkinme.checkin</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_checkinme_checkin_form"/>
+        <field name="target">current</field>
+        <field name="context">{'default_state': 'checked_in'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Check in at the customer you are visiting right now.
+            </p><p>
+                Your GPS position is captured automatically and linked to Google Maps.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_checkinme_checkin_planned" model="ir.actions.act_window">
+        <field name="name">Planned Visits</field>
+        <field name="res_model">checkinme.checkin</field>
+        <field name="view_mode">list,kanban,form,calendar</field>
+        <field name="search_view_id" ref="view_checkinme_checkin_search"/>
+        <field name="domain">[('state', '=', 'draft')]</field>
+        <field name="context">{'default_state': 'draft', 'search_default_filter_my': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No planned visit. Plan your next customer visits!
+            </p><p>
+                Plan a visit in advance with the customer, the purpose and the expected time,
+                then simply press "Check In" when you arrive on site.
+            </p>
+        </field>
+    </record>
+
+</odoo>

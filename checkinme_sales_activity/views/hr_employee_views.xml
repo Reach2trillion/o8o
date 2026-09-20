@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_employee_form_inherit_checkinme" model="ir.ui.view">
+        <field name="name">hr.employee.form.inherit.checkinme</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_checkinme_checkins" type="object" class="oe_stat_button"
+                        icon="fa-map-marker" groups="checkinme_sales_activity.group_checkinme_user">
+                    <field name="checkinme_checkin_count" widget="statinfo" string="Check-ins"/>
+                </button>
+                <button name="action_view_checkinme_targets" type="object" class="oe_stat_button"
+                        icon="fa-bullseye" groups="checkinme_sales_activity.group_checkinme_user">
+                    <field name="checkinme_target_count" widget="statinfo" string="Targets"/>
+                </button>
+            </xpath>
+            <xpath expr="//page[@name='hr_settings']/group" position="inside">
+                <group string="CheckinMe" name="checkinme_settings">
+                    <field name="checkinme_telegram_chat_id" placeholder="e.g. 123456789"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

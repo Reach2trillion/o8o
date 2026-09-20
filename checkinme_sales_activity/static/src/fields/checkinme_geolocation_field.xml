@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="checkinme_sales_activity.GeolocationField">
+        <div class="o_checkinme_geolocation d-flex flex-column gap-1">
+            <div class="o_checkinme_geolocation_coords d-flex flex-wrap align-items-center gap-2">
+                <t t-if="hasPosition">
+                    <i class="fa fa-map-marker text-primary" role="img" aria-label="GPS position"/>
+                    <span class="o_checkinme_coords_value" t-esc="formattedPosition"/>
+                    <span t-if="formattedAccuracy" class="o_checkinme_accuracy badge rounded-pill text-bg-light" t-esc="formattedAccuracy"/>
+                </t>
+                <span t-else="" class="text-muted fst-italic">No GPS position captured yet</span>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <button t-if="!props.readonly"
+                        type="button"
+                        class="btn btn-secondary btn-sm o_checkinme_capture_btn"
+                        t-att-disabled="state.loading"
+                        t-on-click.stop="capture">
+                    <i t-if="state.loading" class="fa fa-spinner fa-spin me-1" role="img" aria-label="Locating"/>
+                    <i t-else="" class="fa fa-crosshairs me-1" role="img" aria-label="Capture GPS"/>
+                    <t t-if="state.loading">Locating...</t>
+                    <t t-else="">Capture GPS</t>
+                </button>
+                <a t-if="hasPosition"
+                   class="btn btn-link btn-sm o_checkinme_maps_link"
+                   t-att-href="googleMapsUrl"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   t-on-click.stop="">
+                    <i class="fa fa-map-marker me-1" role="img" aria-label="Google Maps"/>Open in Google Maps
+                </a>
+            </div>
+            <div t-if="state.error" class="o_checkinme_geolocation_error text-danger small" t-esc="state.error"/>
+        </div>
+    </t>
+
+</templates>

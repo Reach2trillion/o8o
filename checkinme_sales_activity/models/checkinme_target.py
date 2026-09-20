@@ -83,7 +83,7 @@ class CheckinmeTarget(models.Model):
         help="Share of the month already elapsed.")
     days_remaining = fields.Integer(compute='_compute_progress')
     is_current = fields.Boolean(compute='_compute_progress', search='_search_is_current')
-    status = fields.Selection(TARGET_STATUSES, compute='_compute_status', string='Status')
+    status = fields.Selection(TARGET_STATUSES, compute='_compute_status', search='_search_status', string='Status')
 
     _sql_constraints = [
         ('employee_period_uniq', 'unique(employee_id, year, month, company_id)',
@@ -173,6 +173,18 @@ class CheckinmeTarget(models.Model):
         if (operator == '=' and value) or (operator == '!=' and not value):
             return domain
         return ['!'] + domain
+
+    def _search_status(self, operator, value):
+        """Status is computed live (actuals + today); evaluate it on the candidate targets."""
+        if operator not in ('=', '!=', 'in', 'not in'):
+            raise ValueError(_("Unsupported operator %s for the status field.", operator))
+        values = set(value if isinstance(value, (list, tuple, set)) else [value])
+        targets = self.search([('active', 'in', (True, False))]) if self.env.context.get('active_test', True) is False \
+            else self.search([])
+        matching = targets.filtered(lambda t: t.status in values)
+        if operator in ('=', 'in'):
+            return [('id', 'in', matching.ids)]
+        return [('id', 'not in', matching.ids)]
 
     @api.depends('achievement_rate', 'expected_progress', 'target_visits', 'target_new_customers',
                  'target_orders', 'target_sales_amount')

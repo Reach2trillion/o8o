@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Settings > CheckinMe                                              -->
+    <!-- ================================================================ -->
+    <record id="res_config_settings_view_form_checkinme" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.checkinme</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="85"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="CheckinMe" string="CheckinMe" name="checkinme_sales_activity"
+                     groups="checkinme_sales_activity.group_checkinme_manager">
+
+                    <!-- Telegram -->
+                    <block title="Telegram Integration" name="checkinme_telegram_setting_container">
+                        <setting id="checkinme_telegram_bot_setting" string="Telegram Bot"
+                                 help="Create a bot with @BotFather, add it to the managers' group (or channel) and paste its token and the chat id here. Notifications and reports are sent to this chat.">
+                            <div class="content-group">
+                                <div class="row mt16">
+                                    <label for="checkinme_telegram_bot_token" class="col-lg-4 o_light_label"/>
+                                    <field name="checkinme_telegram_bot_token" password="True" nolabel="1"
+                                           placeholder="123456789:AAExampleBotTokenFromBotFather"/>
+                                </div>
+                                <div class="row">
+                                    <label for="checkinme_telegram_chat_id" class="col-lg-4 o_light_label"/>
+                                    <field name="checkinme_telegram_chat_id" nolabel="1" placeholder="-1001234567890"/>
+                                </div>
+                            </div>
+                            <div class="mt8">
+                                <button name="action_checkinme_test_telegram" type="object"
+                                        string="Test Connection" class="btn-link" icon="fa-paper-plane"/>
+                                <button name="action_checkinme_send_daily_report" type="object"
+                                        string="Send Today's Report Now" class="btn-link" icon="fa-file-text-o"/>
+                            </div>
+                        </setting>
+                        <setting id="checkinme_notify_checkin_setting" string="Notify Managers on Check-in"
+                                 help="Send an instant Telegram message to the managers' chat (and to the personal chat of the employee's manager) each time a salesperson checks in at a customer.">
+                            <field name="checkinme_notify_checkin"/>
+                        </setting>
+                        <setting id="checkinme_notify_checkout_setting" string="Notify Managers on Check-out"
+                                 help="Send an instant Telegram message with the visit duration, outcome and notes when a salesperson checks out.">
+                            <field name="checkinme_notify_checkout"/>
+                        </setting>
+                        <setting id="checkinme_send_location_pin_setting" string="Send Location Pin"
+                                 help="Attach the GPS position of the check-in as a Telegram location pin (opens in the map application) in addition to the Google Maps link.">
+                            <field name="checkinme_send_location_pin"/>
+                        </setting>
+                        <setting id="checkinme_send_photo_setting" string="Send Check-in Photo"
+                                 help="Send the photo taken at the customer's site (if any) together with the check-in notification.">
+                            <field name="checkinme_send_photo"/>
+                        </setting>
+                    </block>
+
+                    <!-- Automatic reports -->
+                    <block title="Automatic Reports" name="checkinme_reports_setting_container">
+                        <setting id="checkinme_daily_report_setting" string="Daily Report"
+                                 help="Every evening, send the activity summary of the day (visits, verified visits, new customers, orders and sales per salesperson) to the managers' Telegram chat. The sending time is editable under Settings &gt; Technical &gt; Scheduled Actions (CheckinMe: Daily Telegram Activity Report).">
+                            <field name="checkinme_daily_report"/>
+                        </setting>
+                        <setting id="checkinme_weekly_report_setting" string="Weekly Report"
+                                 help="Every Monday morning, send the report of the previous week with the progress towards the monthly targets. The schedule is editable under Settings &gt; Technical &gt; Scheduled Actions (CheckinMe: Weekly Telegram Activity Report).">
+                            <field name="checkinme_weekly_report"/>
+                        </setting>
+                        <setting id="checkinme_monthly_report_setting" string="Monthly Report"
+                                 help="On the 1st of each month, send the results of the previous month against the KPI targets of every salesperson. The schedule is editable under Settings &gt; Technical &gt; Scheduled Actions (CheckinMe: Monthly Telegram Activity Report).">
+                            <field name="checkinme_monthly_report"/>
+                        </setting>
+                    </block>
+
+                    <!-- GPS -->
+                    <block title="GPS Verification" name="checkinme_gps_setting_container">
+                        <setting id="checkinme_require_gps_setting" string="Require GPS Position to Check In"
+                                 help="Salespeople cannot check in until the phone's GPS position has been captured. Disable it only if some devices cannot provide a location.">
+                            <field name="checkinme_require_gps"/>
+                        </setting>
+                        <setting id="checkinme_max_distance_setting" string="Maximum Distance from Customer"
+                                 help="A visit is marked 'Verified on site' when the check-in position is within this distance of the customer's geolocation (geolocalize customers from their contact form). Check-ins further away are flagged for the manager.">
+                            <div class="d-flex align-items-center">
+                                <field name="checkinme_max_distance" class="text-center" style="width: 8ch;"/>
+                                <span class="ms-2">meters</span>
+                            </div>
+                        </setting>
+                    </block>
+
+                    <!-- KPI -->
+                    <block title="KPI" name="checkinme_kpi_setting_container">
+                        <setting id="checkinme_sales_source_setting" string="Sales Results Source"
+                                 help="Choose how the actual sales amount is measured against the monthly targets and in the Telegram reports: from the confirmed sales orders of the salesperson, or from the sales amount entered manually on each check-in.">
+                            <field name="checkinme_sales_source" widget="radio"/>
+                        </setting>
+                    </block>
+
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_checkinme_config_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'checkinme_sales_activity', 'bin_size': False}</field>
+    </record>
+
+</odoo>

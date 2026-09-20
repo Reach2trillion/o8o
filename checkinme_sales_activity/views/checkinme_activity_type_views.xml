@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_checkinme_activity_type_list" model="ir.ui.view">
+        <field name="name">checkinme.activity.type.list</field>
+        <field name="model">checkinme.activity.type</field>
+        <field name="arch" type="xml">
+            <list string="Activity Types">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="counts_as_visit"/>
+                <field name="requires_customer"/>
+                <field name="checkin_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_checkinme_activity_type_form" model="ir.ui.view">
+        <field name="name">checkinme.activity.type.form</field>
+        <field name="model">checkinme.activity.type</field>
+        <field name="arch" type="xml">
+            <form string="Activity Type">
+                <sheet>
+                    <div name="button_box" class="oe_button_box">
+                        <button name="action_view_checkins" type="object" class="oe_stat_button" icon="fa-map-marker">
+                            <field name="checkin_count" widget="statinfo" string="Check-ins"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Customer Visit"/></h1>
+                    </div>
+                    <group>
+                        <group name="main">
+                            <field name="code" placeholder="e.g. VISIT"/>
+                            <field name="sequence"/>
+                            <field name="color" widget="color_picker"/>
+                            <field name="icon" placeholder="e.g. fa-handshake-o"/>
+                        </group>
+                        <group name="options">
+                            <field name="counts_as_visit"/>
+                            <field name="requires_customer"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1" colspan="2"
+                               placeholder="Explain to salespeople when to use this activity type..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_checkinme_activity_type_search" model="ir.ui.view">
+        <field name="name">checkinme.activity.type.search</field>
+        <field name="model">checkinme.activity.type</field>
+        <field name="arch" type="xml">
+            <search string="Search Activity Types">
+                <field name="name"/>
+                <field name="code"/>
+                <filter string="Counts as Field Visit" name="filter_visit" domain="[('counts_as_visit', '=', True)]"/>
+                <filter string="Customer Required" name="filter_requires_customer" domain="[('requires_customer', '=', True)]"/>
+                <separator/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_checkinme_activity_type" model="ir.actions.act_window">
+        <field name="name">Activity Types</field>
+        <field name="res_model">checkinme.activity.type</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_checkinme_activity_type_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No activity type yet. Let's create one!
+            </p><p>
+                Activity types classify check-ins (customer visit, meeting, product demo, delivery...)
+                and define which ones count as field visits for KPI targets and reports.
+            </p>
+        </field>
+    </record>
+
+</odoo>

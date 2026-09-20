@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Telegram Message Log (system generated, read only)               -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_telegram_log_list" model="ir.ui.view">
+        <field name="name">checkinme.telegram.log.list</field>
+        <field name="model">checkinme.telegram.log</field>
+        <field name="arch" type="xml">
+            <list string="Telegram Logs" create="0" edit="0" sample="1"
+                  decoration-danger="state == 'failed'"
+                  decoration-muted="state == 'skipped'">
+                <field name="create_date" string="Sent On"/>
+                <field name="message_type"/>
+                <field name="chat_id"/>
+                <field name="method" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'sent'"
+                       decoration-danger="state == 'failed'"
+                       decoration-muted="state == 'skipped'"/>
+                <field name="employee_id" widget="many2one_avatar_employee" optional="show"/>
+                <field name="checkin_id" optional="show"/>
+                <field name="response" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_checkinme_telegram_log_form" model="ir.ui.view">
+        <field name="name">checkinme.telegram.log.form</field>
+        <field name="model">checkinme.telegram.log</field>
+        <field name="arch" type="xml">
+            <form string="Telegram Log" create="0" edit="0">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="message_type" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group name="group_message">
+                            <field name="create_date" string="Sent On" readonly="1"/>
+                            <field name="state" widget="badge" readonly="1"
+                                   decoration-success="state == 'sent'"
+                                   decoration-danger="state == 'failed'"
+                                   decoration-muted="state == 'skipped'"/>
+                            <field name="method" readonly="1"/>
+                            <field name="chat_id" readonly="1"/>
+                        </group>
+                        <group name="group_links">
+                            <field name="employee_id" readonly="1"/>
+                            <field name="checkin_id" readonly="1"/>
+                            <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                        </group>
+                    </group>
+                    <group name="group_text" string="Message">
+                        <field name="message" nolabel="1" colspan="2" widget="text" readonly="1"/>
+                    </group>
+                    <group name="group_response" string="API Response / Error">
+                        <field name="response" nolabel="1" colspan="2" widget="text" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_checkinme_telegram_log_search" model="ir.ui.view">
+        <field name="name">checkinme.telegram.log.search</field>
+        <field name="model">checkinme.telegram.log</field>
+        <field name="arch" type="xml">
+            <search string="Search Telegram Logs">
+                <field name="chat_id"/>
+                <field name="employee_id"/>
+                <field name="checkin_id"/>
+                <field name="message_type"/>
+                <field name="message"/>
+                <field name="response"/>
+                <filter string="Sent" name="filter_sent" domain="[('state', '=', 'sent')]"/>
+                <filter string="Failed" name="filter_failed" domain="[('state', '=', 'failed')]"/>
+                <filter string="Skipped" name="filter_skipped" domain="[('state', '=', 'skipped')]"/>
+                <separator/>
+                <filter string="Check-in / Check-out Notifications" name="filter_notifications"
+                        domain="[('message_type', 'in', ('checkin', 'checkout'))]"/>
+                <filter string="Periodic Reports" name="filter_reports"
+                        domain="[('message_type', 'in', ('daily', 'weekly', 'monthly', 'report'))]"/>
+                <filter string="Test Messages" name="filter_test" domain="[('message_type', '=', 'test')]"/>
+                <separator/>
+                <filter string="Today" name="filter_today"
+                        domain="[('create_date', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0, 0, 0)).to_utc()),
+                                 ('create_date', '&lt;=', datetime.datetime.combine(context_today(), datetime.time(23, 59, 59)).to_utc())]"/>
+                <filter string="Last 7 Days" name="filter_week"
+                        domain="[('create_date', '&gt;', datetime.datetime.combine(context_today() - datetime.timedelta(days=7), datetime.time(23, 59, 59)).to_utc())]"/>
+                <filter string="Sent On" name="filter_date" date="create_date"/>
+                <group expand="0" string="Group By">
+                    <filter string="Message Type" name="group_type" context="{'group_by': 'message_type'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Salesperson" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Chat" name="group_chat" context="{'group_by': 'chat_id'}"/>
+                    <filter string="Day" name="group_day" context="{'group_by': 'create_date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_checkinme_telegram_log" model="ir.actions.act_window">
+        <field name="name">Telegram Logs</field>
+        <field name="res_model">checkinme.telegram.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_checkinme_telegram_log_search"/>
+        <field name="context">{'search_default_filter_week': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Telegram message sent yet
+            </p>
+            <p>
+                Every check-in notification and periodic report sent through the Telegram bot is
+                logged here with the API response, so you can troubleshoot delivery problems.
+                Configure the bot token and the managers' chat under CheckinMe &gt; Configuration &gt; Settings.
+            </p>
+        </field>
+    </record>
+
+</odoo>

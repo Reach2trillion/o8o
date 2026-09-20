@@ -1,0 +1,93 @@
+// CheckinMe Sales Activity - mobile friendly tweaks for the backend client.
+// Plain CSS values only (no dependency on Odoo / Bootstrap SCSS variables).
+
+// ---------------------------------------------------------------------------
+// Check-in form
+// ---------------------------------------------------------------------------
+.o_checkinme_checkin_form {
+    .o_form_statusbar .btn {
+        min-height: 44px;
+    }
+
+    @media (max-width: 767px) {
+        .o_form_statusbar {
+            flex-wrap: wrap;
+            row-gap: 0.25rem;
+        }
+
+        .o_form_statusbar .btn-primary,
+        .o_form_statusbar .btn-secondary {
+            min-height: 48px;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+        }
+
+        .o_form_sheet .btn-primary {
+            min-height: 44px;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GPS geolocation widget
+// ---------------------------------------------------------------------------
+.o_checkinme_geolocation {
+    .o_checkinme_coords_value {
+        font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.95rem;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+    }
+
+    .o_checkinme_maps_link {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .o_checkinme_geolocation_error {
+        white-space: normal;
+    }
+}
+
+.o_checkinme_capture_btn {
+    min-width: 10rem;
+
+    @media (max-width: 767px) {
+        min-height: 44px;
+        flex: 1 1 auto;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Kanban cards (check-ins) and target / KPI kanban
+// ---------------------------------------------------------------------------
+.o_checkinme_kanban_card {
+    .o_progressbar,
+    .progress {
+        width: 100%;
+    }
+
+    .o_checkinme_kanban_meta {
+        font-size: 0.85rem;
+        white-space: normal;
+        word-break: break-word;
+    }
+}
+
+.o_checkinme_target_kanban {
+    .o_progressbar,
+    .progress {
+        width: 100%;
+    }
+
+    .o_progressbar {
+        margin-bottom: 0.25rem;
+    }
+
+    .o_checkinme_target_metric {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        margin-bottom: 0.5rem;
+    }
+}

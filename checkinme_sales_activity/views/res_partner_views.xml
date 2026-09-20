@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_partner_form_inherit_checkinme" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.checkinme</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_checkinme_checkins" type="object" class="oe_stat_button"
+                        icon="fa-map-marker" groups="checkinme_sales_activity.group_checkinme_user">
+                    <field name="checkinme_checkin_count" widget="statinfo" string="Visits"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_list_inherit_checkinme" model="ir.ui.view">
+        <field name="name">res.partner.list.inherit.checkinme</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='company_id']" position="before">
+                <field name="checkinme_checkin_count" optional="show"
+                       groups="checkinme_sales_activity.group_checkinme_user"/>
+                <field name="checkinme_last_checkin_time" optional="show"
+                       groups="checkinme_sales_activity.group_checkinme_user"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_checkinme_customer" model="ir.actions.act_window">
+        <field name="name">Customers</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="context">{'default_is_company': True, 'res_partner_search_mode': 'customer'}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No customer yet. Let's create one!
+            </p><p>
+                Geolocate your customers (Contact &#8594; Geolocate) so that every check-in
+                can be verified against the customer's real position.
+            </p>
+        </field>
+    </record>
+
+</odoo>

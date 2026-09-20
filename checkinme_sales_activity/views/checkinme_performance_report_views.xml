@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Sales Performance Analysis (SQL view: check-ins + sales orders)   -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_performance_report_pivot" model="ir.ui.view">
+        <field name="name">checkinme.performance.report.pivot</field>
+        <field name="model">checkinme.performance.report</field>
+        <field name="arch" type="xml">
+            <pivot string="Sales Performance Analysis" sample="1">
+                <field name="employee_id" type="row"/>
+                <field name="date" interval="month" type="col"/>
+                <field name="visit_count" type="measure"/>
+                <field name="verified_count" type="measure"/>
+                <field name="new_customer_count" type="measure"/>
+                <field name="order_count" type="measure"/>
+                <field name="order_amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_checkinme_performance_report_graph" model="ir.ui.view">
+        <field name="name">checkinme.performance.report.graph</field>
+        <field name="model">checkinme.performance.report</field>
+        <field name="arch" type="xml">
+            <graph string="Sales Performance Analysis" type="bar" sample="1">
+                <field name="employee_id"/>
+                <field name="date" interval="month"/>
+                <field name="order_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_checkinme_performance_report_list" model="ir.ui.view">
+        <field name="name">checkinme.performance.report.list</field>
+        <field name="model">checkinme.performance.report</field>
+        <field name="arch" type="xml">
+            <list string="Sales Performance" create="0" edit="0" delete="0" sample="1">
+                <field name="currency_id" column_invisible="1"/>
+                <field name="date"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
+                <field name="record_type"/>
+                <field name="partner_id"/>
+                <field name="checkin_type_id" optional="show"/>
+                <field name="checkin_id" optional="show"/>
+                <field name="sale_order_id" optional="show"/>
+                <field name="location_status" optional="hide"/>
+                <field name="outcome" optional="hide"/>
+                <field name="visit_count" sum="Total Visits"/>
+                <field name="verified_count" sum="Total Verified Visits"/>
+                <field name="new_customer_count" sum="Total New Customers"/>
+                <field name="order_count" sum="Total Orders"/>
+                <field name="order_amount" sum="Total Orders Amount"/>
+                <field name="checkin_sale_amount" sum="Total Check-in Sales" optional="hide"/>
+                <field name="duration" widget="float_time" sum="Total Duration" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_checkinme_performance_report_search" model="ir.ui.view">
+        <field name="name">checkinme.performance.report.search</field>
+        <field name="model">checkinme.performance.report</field>
+        <field name="arch" type="xml">
+            <search string="Search Sales Performance">
+                <field name="employee_id"/>
+                <field name="partner_id"/>
+                <field name="checkin_type_id"/>
+                <field name="checkin_id"/>
+                <field name="sale_order_id"/>
+                <field name="date"/>
+                <filter string="My Results" name="filter_my" domain="[('user_id', '=', uid)]"/>
+                <filter string="My Team" name="filter_team" domain="[('employee_id.parent_id.user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Today" name="filter_today"
+                        domain="[('date', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter string="This Week" name="filter_week"
+                        domain="[('date', '&gt;=', (context_today() + relativedelta(weeks=-1, days=1, weekday=0)).strftime('%Y-%m-%d')),
+                                 ('date', '&lt;', (context_today() + relativedelta(days=1, weekday=0)).strftime('%Y-%m-%d'))]"/>
+                <filter string="This Month" name="filter_month"
+                        domain="[('date', '&gt;=', context_today().strftime('%Y-%m-01')),
+                                 ('date', '&lt;', (context_today() + relativedelta(months=1, day=1)).strftime('%Y-%m-%d'))]"/>
+                <filter string="This Year" name="filter_year"
+                        domain="[('date', '&gt;=', context_today().strftime('%Y-01-01')),
+                                 ('date', '&lt;=', context_today().strftime('%Y-12-31'))]"/>
+                <filter string="Date" name="filter_date" date="date"/>
+                <separator/>
+                <filter string="Visits" name="filter_visits" domain="[('record_type', '=', 'checkin')]"/>
+                <filter string="Sales Orders" name="filter_sales" domain="[('record_type', '=', 'sale')]"/>
+                <separator/>
+                <filter string="Verified on Site" name="filter_verified" domain="[('location_status', '=', 'verified')]"/>
+                <filter string="New Customers" name="filter_new_customers" domain="[('new_customer_count', '&gt;', 0)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Salesperson" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Customer" name="group_partner" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Activity Type" name="group_activity_type" context="{'group_by': 'checkin_type_id'}"/>
+                    <filter string="Record Type" name="group_record_type" context="{'group_by': 'record_type'}"/>
+                    <filter string="Outcome" name="group_outcome" context="{'group_by': 'outcome'}"/>
+                    <separator/>
+                    <filter string="Day" name="group_day" context="{'group_by': 'date:day'}"/>
+                    <filter string="Week" name="group_week" context="{'group_by': 'date:week'}"/>
+                    <filter string="Month" name="group_month" context="{'group_by': 'date:month'}"/>
+                    <filter string="Quarter" name="group_quarter" context="{'group_by': 'date:quarter'}"/>
+                    <filter string="Year" name="group_year" context="{'group_by': 'date:year'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_checkinme_performance_report" model="ir.actions.act_window">
+        <field name="name">Performance Analysis</field>
+        <field name="res_model">checkinme.performance.report</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="search_view_id" ref="view_checkinme_performance_report_search"/>
+        <field name="context">{'search_default_filter_month': 1, 'search_default_group_employee': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No sales activity to analyse yet
+            </p>
+            <p>
+                This report combines GPS check-ins (visits, verified visits, new customers) and
+                confirmed sales orders (orders, amount) per salesperson. Use the Day, Week, Month,
+                Quarter and Year group-bys to get daily, weekly, monthly and yearly results
+                for each employee, and switch to the graph view to compare salespeople.
+            </p>
+        </field>
+    </record>
+
+</odoo>

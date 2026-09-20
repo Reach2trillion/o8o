@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Monthly Sales Target (KPI): Form                                  -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_target_form" model="ir.ui.view">
+        <field name="name">checkinme.target.form</field>
+        <field name="model">checkinme.target</field>
+        <field name="arch" type="xml">
+            <form string="Sales Target" class="o_checkinme_target_form">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_checkins" type="object" class="oe_stat_button" icon="fa-map-marker"
+                                help="Verified check-ins of this salesperson during the month">
+                            <field name="actual_visits" widget="statinfo" string="Visits"/>
+                        </button>
+                        <button name="action_view_sale_orders" type="object" class="oe_stat_button" icon="fa-shopping-cart"
+                                groups="sales_team.group_sale_salesman"
+                                help="Confirmed sales orders of this salesperson during the month">
+                            <field name="actual_orders" widget="statinfo" string="Orders"/>
+                        </button>
+                    </div>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+                    <field name="currency_id" invisible="1"/>
+                    <field name="is_current" invisible="1"/>
+                    <field name="user_id" invisible="1"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1" placeholder="New Monthly Target"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group name="group_period" string="Period">
+                            <field name="employee_id" widget="many2one_avatar_employee" options="{'no_create': True}"/>
+                            <field name="year"/>
+                            <field name="month"/>
+                            <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
+                            <field name="date_from" readonly="1"/>
+                            <field name="date_to" readonly="1"/>
+                            <field name="status" widget="badge"
+                                   decoration-success="status == 'achieved'"
+                                   decoration-info="status == 'on_track'"
+                                   decoration-warning="status == 'at_risk'"
+                                   decoration-danger="status == 'behind'"
+                                   decoration-muted="status == 'none'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group name="group_targets" string="Targets">
+                            <field name="target_visits"/>
+                            <field name="target_new_customers"/>
+                            <field name="target_orders"/>
+                            <field name="target_sales_amount"/>
+                        </group>
+                        <group name="group_actual" string="Actual (real time)">
+                            <field name="actual_visits"/>
+                            <field name="actual_verified_visits"/>
+                            <field name="actual_customers"/>
+                            <field name="actual_new_customers"/>
+                            <field name="actual_orders"/>
+                            <field name="actual_sales_amount"/>
+                            <field name="expected_progress" widget="progressbar"/>
+                            <field name="days_remaining"/>
+                        </group>
+                    </group>
+                    <group name="group_achievement" string="Achievement">
+                        <group>
+                            <field name="achievement_visits" widget="progressbar"/>
+                            <field name="achievement_new_customers" widget="progressbar"/>
+                            <field name="achievement_orders" widget="progressbar"/>
+                        </group>
+                        <group>
+                            <field name="achievement_sales" widget="progressbar"/>
+                            <field name="achievement_rate" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <group name="group_note" string="Notes">
+                        <field name="note" nolabel="1" colspan="2"
+                               placeholder="Coaching notes, agreed action plan, focus customers for the month..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- List                                                              -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_target_list" model="ir.ui.view">
+        <field name="name">checkinme.target.list</field>
+        <field name="model">checkinme.target</field>
+        <field name="arch" type="xml">
+            <list string="Sales Targets" sample="1" multi_edit="1"
+                  decoration-muted="status == 'none'">
+                <field name="currency_id" column_invisible="1"/>
+                <field name="name"/>
+                <field name="employee_id" widget="many2one_avatar_employee"/>
+                <field name="year"/>
+                <field name="month"/>
+                <field name="target_visits" sum="Total Target Visits"/>
+                <field name="actual_visits" sum="Total Visits"/>
+                <field name="achievement_visits" widget="progressbar"/>
+                <field name="target_new_customers" optional="hide"/>
+                <field name="actual_new_customers" optional="hide"/>
+                <field name="achievement_new_customers" widget="progressbar" optional="hide"/>
+                <field name="target_orders" optional="hide"/>
+                <field name="actual_orders" optional="hide"/>
+                <field name="achievement_orders" widget="progressbar" optional="hide"/>
+                <field name="target_sales_amount" sum="Total Target Sales"/>
+                <field name="actual_sales_amount" sum="Total Sales"/>
+                <field name="achievement_sales" widget="progressbar"/>
+                <field name="achievement_rate" widget="progressbar"/>
+                <field name="days_remaining" optional="hide"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'achieved'"
+                       decoration-info="status == 'on_track'"
+                       decoration-warning="status == 'at_risk'"
+                       decoration-danger="status == 'behind'"
+                       decoration-muted="status == 'none'"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Kanban (mobile friendly cards)                                    -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_target_kanban" model="ir.ui.view">
+        <field name="name">checkinme.target.kanban</field>
+        <field name="model">checkinme.target</field>
+        <field name="arch" type="xml">
+            <kanban class="o_checkinme_target_kanban o_kanban_mobile" sample="1" quick_create="false"
+                    default_order="year desc, month desc, employee_id">
+                <field name="currency_id"/>
+                <field name="status"/>
+                <field name="is_current"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex align-items-start mb-2">
+                            <div class="flex-grow-1 min-w-0">
+                                <field name="employee_id" class="fw-bold fs-5 d-block text-truncate"/>
+                                <field name="name" class="text-muted small"/>
+                            </div>
+                            <field name="status" widget="badge" class="ms-2 flex-shrink-0"
+                                   decoration-success="status == 'achieved'"
+                                   decoration-info="status == 'on_track'"
+                                   decoration-warning="status == 'at_risk'"
+                                   decoration-danger="status == 'behind'"
+                                   decoration-muted="status == 'none'"/>
+                        </div>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span class="fw-bold">Sales</span>
+                                <span>
+                                    <field name="actual_sales_amount" widget="monetary"/>
+                                    <span class="text-muted"> / </span>
+                                    <field name="target_sales_amount" widget="monetary"/>
+                                </span>
+                            </div>
+                            <field name="achievement_sales" widget="progressbar"/>
+                        </div>
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span class="fw-bold">Visits</span>
+                                <span>
+                                    <field name="actual_visits"/>
+                                    <span class="text-muted"> / </span>
+                                    <field name="target_visits"/>
+                                </span>
+                            </div>
+                            <field name="achievement_visits" widget="progressbar"/>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted">
+                            <span>
+                                <i class="fa fa-user-plus me-1" title="New customers"/>
+                                <field name="actual_new_customers"/> / <field name="target_new_customers"/>
+                            </span>
+                            <span>
+                                <i class="fa fa-shopping-cart me-1" title="Orders"/>
+                                <field name="actual_orders"/> / <field name="target_orders"/>
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>
+                                <i class="fa fa-line-chart me-1" title="Overall achievement"/>
+                                <field name="achievement_rate"/>% overall
+                            </span>
+                            <span invisible="not is_current">
+                                <i class="fa fa-clock-o me-1" title="Days remaining"/>
+                                <field name="days_remaining"/> days left
+                            </span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Pivot / Graph                                                     -->
+    <!-- NOTE: actual_* and achievement_* are non-stored computed fields,  -->
+    <!-- they cannot be aggregated in SQL (pivot/graph measures).          -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_target_pivot" model="ir.ui.view">
+        <field name="name">checkinme.target.pivot</field>
+        <field name="model">checkinme.target</field>
+        <field name="arch" type="xml">
+            <pivot string="Targets Analysis" sample="1">
+                <field name="employee_id" type="row"/>
+                <field name="date_from" interval="month" type="col"/>
+                <field name="target_sales_amount" type="measure"/>
+                <field name="target_visits" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_checkinme_target_graph" model="ir.ui.view">
+        <field name="name">checkinme.target.graph</field>
+        <field name="model">checkinme.target</field>
+        <field name="arch" type="xml">
+            <graph string="Targets Analysis" type="bar" sample="1">
+                <field name="employee_id"/>
+                <field name="date_from" interval="month"/>
+                <field name="target_sales_amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Search                                                            -->
+    <!-- ================================================================ -->
+    <record id="view_checkinme_target_search" model="ir.ui.view">
+        <field name="name">checkinme.target.search</field>
+        <field name="model">checkinme.target</field>
+        <field name="arch" type="xml">
+            <search string="Search Targets">
+                <field name="employee_id"/>
+                <field name="name"/>
+                <field name="year"/>
+                <filter string="My Targets" name="filter_my" domain="[('user_id', '=', uid)]"/>
+                <filter string="My Team" name="filter_team" domain="[('employee_id.parent_id.user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Current Month" name="filter_current" domain="[('is_current', '=', True)]"/>
+                <filter string="This Year" name="filter_year" domain="[('year', '=', context_today().year)]"/>
+                <separator/>
+                <filter string="Achieved" name="filter_achieved" domain="[('status', '=', 'achieved')]"/>
+                <filter string="On Track" name="filter_on_track" domain="[('status', '=', 'on_track')]"/>
+                <filter string="At Risk" name="filter_at_risk" domain="[('status', '=', 'at_risk')]"/>
+                <filter string="Behind" name="filter_behind" domain="[('status', '=', 'behind')]"/>
+                <separator/>
+                <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Salesperson" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Year" name="group_year" context="{'group_by': 'year'}"/>
+                    <filter string="Month" name="group_month" context="{'group_by': 'month'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Action                                                            -->
+    <!-- ================================================================ -->
+    <record id="action_checkinme_target" model="ir.actions.act_window">
+        <field name="name">Targets &amp; KPI</field>
+        <field name="res_model">checkinme.target</field>
+        <field name="view_mode">kanban,list,form,pivot,graph</field>
+        <field name="search_view_id" ref="view_checkinme_target_search"/>
+        <field name="context">{'search_default_filter_current': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Set a monthly target for your salespeople
+            </p>
+            <p>
+                Define how many visits, new customers, orders and how much sales each salesperson
+                should achieve this month. Actual results are computed in real time from GPS
+                check-ins and confirmed sales orders, so everyone can see who is on track,
+                at risk or behind.
+            </p>
+        </field>
+    </record>
+
+</odoo>

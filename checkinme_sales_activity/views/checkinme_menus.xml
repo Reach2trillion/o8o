@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Root -->
+    <menuitem id="menu_checkinme_root"
+              name="CheckinMe"
+              sequence="25"
+              web_icon="checkinme_sales_activity,static/description/icon.png"
+              groups="checkinme_sales_activity.group_checkinme_user"/>
+
+    <!-- Check-ins -->
+    <menuitem id="menu_checkinme_checkins"
+              name="Check-ins"
+              parent="menu_checkinme_root"
+              sequence="10"/>
+    <menuitem id="menu_checkinme_checkin_now"
+              name="Check In Now"
+              parent="menu_checkinme_checkins"
+              action="action_checkinme_checkin_now"
+              sequence="10"/>
+    <menuitem id="menu_checkinme_checkin_all"
+              name="All Check-ins"
+              parent="menu_checkinme_checkins"
+              action="action_checkinme_checkin"
+              sequence="20"/>
+    <menuitem id="menu_checkinme_checkin_planned"
+              name="Planned Visits"
+              parent="menu_checkinme_checkins"
+              action="action_checkinme_checkin_planned"
+              sequence="30"/>
+    <menuitem id="menu_checkinme_customers"
+              name="Customers"
+              parent="menu_checkinme_checkins"
+              action="action_checkinme_customer"
+              sequence="40"/>
+
+    <!-- Targets & KPI -->
+    <menuitem id="menu_checkinme_targets"
+              name="Targets &amp; KPI"
+              parent="menu_checkinme_root"
+              action="action_checkinme_target"
+              sequence="20"/>
+
+    <!-- Reporting -->
+    <menuitem id="menu_checkinme_reporting"
+              name="Reporting"
+              parent="menu_checkinme_root"
+              sequence="30"/>
+    <menuitem id="menu_checkinme_performance"
+              name="Performance Analysis"
+              parent="menu_checkinme_reporting"
+              action="action_checkinme_performance_report"
+              sequence="10"/>
+    <menuitem id="menu_checkinme_report_wizard"
+              name="Activity Report"
+              parent="menu_checkinme_reporting"
+              action="action_checkinme_report_wizard"
+              sequence="20"/>
+    <menuitem id="menu_checkinme_telegram_log"
+              name="Telegram Logs"
+              parent="menu_checkinme_reporting"
+              action="action_checkinme_telegram_log"
+              groups="checkinme_sales_activity.group_checkinme_manager"
+              sequence="30"/>
+
+    <!-- Configuration -->
+    <menuitem id="menu_checkinme_config"
+              name="Configuration"
+              parent="menu_checkinme_root"
+              groups="checkinme_sales_activity.group_checkinme_manager"
+              sequence="90"/>
+    <menuitem id="menu_checkinme_activity_types"
+              name="Activity Types"
+              parent="menu_checkinme_config"
+              action="action_checkinme_activity_type"
+              sequence="10"/>
+    <menuitem id="menu_checkinme_settings"
+              name="Settings"
+              parent="menu_checkinme_config"
+              action="action_checkinme_config_settings"
+              sequence="20"/>
+
+</odoo>
