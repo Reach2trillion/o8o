@@ -3,7 +3,6 @@
 import { Component, onMounted, onWillUnmount, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
-import { user } from "@web/core/user";
 import { useService } from "@web/core/utils/hooks";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
 
@@ -129,23 +128,18 @@ export class CheckinmeGeolocationField extends Component {
     // ------------------------------------------------------------------
 
     /**
-     * Automatic capture happens once, only when:
-     *  - auto_capture is enabled and the field is editable,
-     *  - no position has been captured yet,
-     *  - the record is new (and auto_capture_on_new is not disabled) OR the record
-     *    is 'checked_in' and belongs to the current user (user_id many2one).
+     * Automatic capture happens once, only for a brand new check-in that is created directly in
+     * the 'checked_in' state (the "Check In Now" flow) and has no position yet. Planned visits get
+     * their position from the "Check In" button and check-outs from the "Check Out" button
+     * (see views/checkin_form/checkin_form_view.js), so nothing is captured merely by opening a form.
      */
     shouldAutoCapture() {
         if (!this.props.autoCapture || this.props.readonly || this.autoCaptureDone || this.hasPosition) {
             return false;
         }
         const record = this.props.record;
-        if (record.isNew) {
-            return this.props.autoCaptureOnNew;
-        }
         const data = record.data || {};
-        const ownerId = Array.isArray(data.user_id) ? data.user_id[0] : false;
-        return data.state === "checked_in" && Boolean(ownerId) && ownerId === user.userId;
+        return Boolean(record.isNew) && this.props.autoCaptureOnNew && data.state === "checked_in";
     }
 
     async capture() {
@@ -159,29 +153,33 @@ export class CheckinmeGeolocationField extends Component {
             return;
         }
         this.state.loading = true;
+        let position;
         try {
-            const position = await new Promise((resolve, reject) => {
+            position = await new Promise((resolve, reject) => {
                 navigator.geolocation.getCurrentPosition(resolve, reject, GEOLOCATION_OPTIONS);
             });
-            if (this.isUnmounted) {
-                return;
-            }
-            const coords = position.coords;
-            const changes = { [this.props.name]: coords.latitude };
-            if (this.props.longitudeField) {
-                changes[this.props.longitudeField] = coords.longitude;
-            }
-            if (this.props.accuracyField) {
-                changes[this.props.accuracyField] = Number.isFinite(coords.accuracy) ? coords.accuracy : 0;
-            }
-            await this.props.record.update(changes);
         } catch (error) {
             this.onCaptureError(error);
+            position = null;
         } finally {
             if (!this.isUnmounted) {
                 this.state.loading = false;
             }
         }
+        // The position may arrive late: never write into a form that became readonly meanwhile.
+        if (!position || this.isUnmounted || this.props.readonly) {
+            return;
+        }
+        const coords = position.coords;
+        const changes = { [this.props.name]: coords.latitude };
+        if (this.props.longitudeField) {
+            changes[this.props.longitudeField] = coords.longitude;
+        }
+        if (this.props.accuracyField) {
+            changes[this.props.accuracyField] = Number.isFinite(coords.accuracy) ? coords.accuracy : 0;
+        }
+        // Outside the geolocation try/catch: ORM errors must surface through Odoo's error handling.
+        await this.props.record.update(changes);
     }
 
     onCaptureError(error) {

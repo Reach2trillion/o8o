@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
+        <!-- Telegram notification queue: triggered right after each check-in / check-out,
+             swept hourly as a safety net. -->
+        <record id="ir_cron_checkinme_telegram_queue" model="ir.cron">
+            <field name="name">CheckinMe: Send Queued Telegram Notifications</field>
+            <field name="model_id" ref="model_checkinme_checkin"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_pending_telegram()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+            <field name="user_id" ref="base.user_root"/>
+        </record>
+
+        <!-- Report crons: the post-install hook re-aligns the times below to the main company's
+             timezone (daily 18:00, weekly Monday 09:00, monthly 1st 09:00 local). -->
         <!-- Daily report: every day at 11:00 UTC (18:00 Asia/Phnom_Penh). Adjust "Next Execution Date" as needed. -->
         <record id="ir_cron_checkinme_daily_report" model="ir.cron">
             <field name="name">CheckinMe: Daily Telegram Activity Report</field>

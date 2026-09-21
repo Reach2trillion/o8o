@@ -152,13 +152,14 @@ class TestReport(CheckinmeCommon):
         self.assertEqual(manager_row['checkins'], 0)
         self.assertEqual(manager_row['target'], idle_target)
 
-        # Multi-month range: monthly targets do not apply
+        # Multi-month range: the target of the last month of the period applies (month to date)
         summary = self.Checkin._get_performance_summary(
             self.month_start - relativedelta(months=1), self.month_end, employees=self.employees)
         rep_row = self._row(summary, self.rep_employee)
-        self.assertFalse(rep_row['target'])
-        self.assertNotIn('target_visits', rep_row)
-        self.assertEqual(summary['totals']['target_visits'], 0)
+        self.assertEqual(rep_row['target'], target)
+        self.assertEqual(rep_row['target_visits'], 10)
+        self.assertEqual(summary['totals']['target_month'], self.month_end)
+        self.assertEqual(summary['totals']['target_visits'], 10)
 
         # Explicitly without targets
         summary = self.Checkin._get_performance_summary(

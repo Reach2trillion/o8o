@@ -24,10 +24,20 @@
     <data noupdate="1">
         <!-- Check-ins -->
         <record id="checkinme_checkin_rule_user" model="ir.rule">
-            <field name="name">Check-in: own and direct reports</field>
+            <field name="name">Check-in: own records</field>
             <field name="model_id" ref="model_checkinme_checkin"/>
-            <field name="domain_force">['|', ('user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">[('user_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('group_checkinme_user'))]"/>
+        </record>
+        <record id="checkinme_checkin_rule_team_read" model="ir.rule">
+            <field name="name">Check-in: direct reports (read only)</field>
+            <field name="model_id" ref="model_checkinme_checkin"/>
+            <field name="domain_force">[('employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
         <record id="checkinme_checkin_rule_manager" model="ir.rule">
             <field name="name">Check-in: manager sees all</field>
@@ -60,6 +70,14 @@
             <field name="model_id" ref="model_checkinme_target"/>
             <field name="global" eval="True"/>
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- Telegram logs -->
+        <record id="checkinme_telegram_log_rule_company" model="ir.rule">
+            <field name="name">Telegram log: multi-company</field>
+            <field name="model_id" ref="model_checkinme_telegram_log"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
         </record>
 
         <!-- Performance report (SQL view) -->

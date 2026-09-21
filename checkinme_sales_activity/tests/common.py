@@ -20,6 +20,8 @@ TELEGRAM_POST_TARGET = 'odoo.addons.checkinme_sales_activity.models.checkinme_te
 
 # Context used for every record creation to skip mail notifications / tracking.
 MAIL_CONTEXT = {
+    # send Telegram notifications synchronously in tests (production queues them for the cron)
+    'checkinme_telegram_sync': True,
     'tracking_disable': True,
     'mail_create_nolog': True,
     'mail_notrack': True,

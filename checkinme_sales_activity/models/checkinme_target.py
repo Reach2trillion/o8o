@@ -15,6 +15,7 @@ MONTHS = [
 
 TARGET_STATUSES = [
     ('none', 'No Target'),
+    ('upcoming', 'Upcoming'),
     ('behind', 'Behind'),
     ('at_risk', 'At Risk'),
     ('on_track', 'On Track'),
@@ -26,7 +27,7 @@ class CheckinmeTarget(models.Model):
     _name = 'checkinme.target'
     _description = 'Monthly Sales Target (KPI)'
     _inherit = ['mail.thread', 'mail.activity.mixin']
-    _order = 'year desc, month desc, employee_id'
+    _order = 'date_from desc, employee_id'
     _check_company_auto = True
 
     @api.model
@@ -131,26 +132,32 @@ class CheckinmeTarget(models.Model):
     def _percentage(actual, target):
         if not target:
             return 0.0
-        return round(100.0 * actual / target, 1)
+        return 100.0 * actual / target
+
+    def _get_achievements(self):
+        """Unrounded achievement percentages: visits, new_customers, orders, sales, overall."""
+        self.ensure_one()
+        pairs = (
+            ('visits', self.actual_visits, self.target_visits),
+            ('new_customers', self.actual_new_customers, self.target_new_customers),
+            ('orders', self.actual_orders, self.target_orders),
+            ('sales', self.actual_sales_amount, self.target_sales_amount),
+        )
+        result = {key: self._percentage(actual, target) for key, actual, target in pairs}
+        rates = [result[key] for key, _actual, target in pairs if target]
+        result['overall'] = sum(rates) / len(rates) if rates else 0.0
+        return result
 
     @api.depends('target_visits', 'actual_visits', 'target_new_customers', 'actual_new_customers',
                  'target_orders', 'actual_orders', 'target_sales_amount', 'actual_sales_amount')
     def _compute_achievements(self):
         for target in self:
-            target.achievement_visits = self._percentage(target.actual_visits, target.target_visits)
-            target.achievement_new_customers = self._percentage(
-                target.actual_new_customers, target.target_new_customers)
-            target.achievement_orders = self._percentage(target.actual_orders, target.target_orders)
-            target.achievement_sales = self._percentage(target.actual_sales_amount, target.target_sales_amount)
-            rates = [
-                pct for pct, tgt in (
-                    (target.achievement_visits, target.target_visits),
-                    (target.achievement_new_customers, target.target_new_customers),
-                    (target.achievement_orders, target.target_orders),
-                    (target.achievement_sales, target.target_sales_amount),
-                ) if tgt
-            ]
-            target.achievement_rate = round(sum(rates) / len(rates), 1) if rates else 0.0
+            rates = target._get_achievements()
+            target.achievement_visits = round(rates['visits'], 1)
+            target.achievement_new_customers = round(rates['new_customers'], 1)
+            target.achievement_orders = round(rates['orders'], 1)
+            target.achievement_sales = round(rates['sales'], 1)
+            target.achievement_rate = round(rates['overall'], 1)
 
     @api.depends('date_from', 'date_to')
     def _compute_progress(self):
@@ -185,19 +192,23 @@ class CheckinmeTarget(models.Model):
             return [('id', 'in', matching.ids)]
         return [('id', 'not in', matching.ids)]
 
-    @api.depends('achievement_rate', 'expected_progress', 'target_visits', 'target_new_customers',
-                 'target_orders', 'target_sales_amount')
+    @api.depends('achievement_rate', 'expected_progress', 'date_from', 'target_visits',
+                 'target_new_customers', 'target_orders', 'target_sales_amount')
     def _compute_status(self):
+        today = self.env['checkinme.checkin']._get_today()
         for target in self:
             has_target = any((target.target_visits, target.target_new_customers,
                               target.target_orders, target.target_sales_amount))
+            rate = target._get_achievements()['overall']  # unrounded
             if not has_target:
                 target.status = 'none'
-            elif target.achievement_rate >= 100.0:
+            elif rate >= 100.0:
                 target.status = 'achieved'
-            elif target.achievement_rate >= target.expected_progress * 0.9:
+            elif target.date_from and today < target.date_from:
+                target.status = 'upcoming'
+            elif rate >= target.expected_progress * 0.9:
                 target.status = 'on_track'
-            elif target.achievement_rate >= target.expected_progress * 0.6:
+            elif rate >= target.expected_progress * 0.6:
                 target.status = 'at_risk'
             else:
                 target.status = 'behind'

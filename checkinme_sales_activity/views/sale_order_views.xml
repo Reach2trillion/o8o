@@ -9,7 +9,7 @@
             <xpath expr="//group[@name='sales_person']/field[@name='user_id']" position="after">
                 <field name="checkinme_checkin_id" options="{'no_create': True}"
                        context="{'default_partner_id': partner_id}"
-                       readonly="state in ('sale', 'cancel')"/>
+                       readonly="state in ('sale', 'cancel')" groups="checkinme_sales_activity.group_checkinme_user"/>
             </xpath>
         </field>
     </record>

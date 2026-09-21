@@ -65,6 +65,7 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
         ],
     },
     'images': ['static/description/banner.png'],
+    'post_init_hook': 'post_init_hook',
     'application': True,
     'installable': True,
     'auto_install': False,

@@ -8,7 +8,7 @@
         <field name="name">checkinme.checkin.form</field>
         <field name="model">checkinme.checkin</field>
         <field name="arch" type="xml">
-            <form string="Sales Check-in" class="o_checkinme_checkin_form">
+            <form string="Sales Check-in" class="o_checkinme_checkin_form" js_class="checkinme_checkin_form">
                 <header>
                     <button name="action_check_in" type="object" string="Check In"
                             class="btn-primary" invisible="state != 'draft'" data-hotkey="q"/>
@@ -90,7 +90,7 @@
                     <group string="Check-out Location" name="checkout_location"
                            invisible="not id or state not in ('checked_in', 'done')">
                         <field name="checkout_latitude" widget="checkinme_geolocation"
-                               options="{'longitude_field': 'checkout_longitude', 'accuracy_field': 'checkout_accuracy', 'auto_capture': True, 'auto_capture_on_new': False}"
+                               options="{'longitude_field': 'checkout_longitude', 'accuracy_field': 'checkout_accuracy', 'auto_capture': False}"
                                invisible="not id or state not in ('checked_in', 'done')"
                                readonly="state in ('done', 'cancel')"/>
                         <field name="checkout_longitude" invisible="1"/>
@@ -235,7 +235,7 @@
                  hide every planned visit and every open check-in that has no check-out time yet. -->
             <calendar string="Sales Check-ins"
                       date_start="checkin_time"
-                      date_delay="duration"
+                      date_stop="calendar_stop"
                       color="employee_id"
                       quick_create="0"
                       event_open_popup="1"
@@ -297,11 +297,11 @@
                 <!-- Monday of the current week. PyDate in the web client has no weekday() method,
                      so the relativedelta(weekday=0) form used by hr_timesheet is used instead. -->
                 <filter string="This Week" name="filter_week"
-                        domain="[('checkin_date', '&gt;=', (context_today() + relativedelta(weeks=-1, days=1, weekday=0)).strftime('%Y-%m-%d'))]"/>
+                        domain="[('checkin_date', '&gt;=', (context_today() + relativedelta(weeks=-1, days=1, weekday=0)).strftime('%Y-%m-%d')), ('checkin_date', '&lt;', (context_today() + relativedelta(days=1, weekday=0)).strftime('%Y-%m-%d'))]"/>
                 <filter string="This Month" name="filter_month"
-                        domain="[('checkin_date', '&gt;=', context_today().strftime('%Y-%m-01'))]"/>
+                        domain="[('checkin_date', '&gt;=', context_today().strftime('%Y-%m-01')), ('checkin_date', '&lt;', (context_today() + relativedelta(months=1, day=1)).strftime('%Y-%m-%d'))]"/>
                 <filter string="This Year" name="filter_year"
-                        domain="[('checkin_date', '&gt;=', context_today().strftime('%Y-01-01'))]"/>
+                        domain="[('checkin_date', '&gt;=', context_today().strftime('%Y-01-01')), ('checkin_date', '&lt;', (context_today() + relativedelta(years=1, month=1, day=1)).strftime('%Y-%m-%d'))]"/>
                 <separator/>
                 <filter string="Planned" name="filter_draft" domain="[('state', '=', 'draft')]"/>
                 <filter string="Checked In / Out" name="filter_checked" domain="[('state', 'in', ('checked_in', 'done'))]"/>

@@ -15,6 +15,7 @@
                 <field name="verified_count" type="measure"/>
                 <field name="new_customer_count" type="measure"/>
                 <field name="order_count" type="measure"/>
+                <field name="checkin_order_count" type="measure"/>
                 <field name="order_amount" type="measure"/>
             </pivot>
         </field>
@@ -51,6 +52,7 @@
                 <field name="verified_count" sum="Total Verified Visits"/>
                 <field name="new_customer_count" sum="Total New Customers"/>
                 <field name="order_count" sum="Total Orders"/>
+                <field name="checkin_order_count" sum="Orders Taken" optional="hide"/>
                 <field name="order_amount" sum="Total Orders Amount"/>
                 <field name="checkin_sale_amount" sum="Total Check-in Sales" optional="hide"/>
                 <field name="duration" widget="float_time" sum="Total Duration" optional="hide"/>

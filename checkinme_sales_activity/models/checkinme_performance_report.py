@@ -33,7 +33,11 @@ class CheckinmePerformanceReport(models.Model):
     duration = fields.Float(string='Visit Duration (Hours)', readonly=True, aggregator='sum')
     checkin_sale_amount = fields.Monetary(
         string='Check-in Sales Amount', currency_field='currency_id', readonly=True, aggregator='sum')
-    order_count = fields.Integer(string='# Orders', readonly=True, aggregator='sum')
+    checkin_order_count = fields.Integer(
+        string='# Orders Taken (Check-ins)', readonly=True, aggregator='sum',
+        help="Check-ins whose outcome is 'Order Taken'.")
+    order_count = fields.Integer(string='# Orders', readonly=True, aggregator='sum',
+                                 help="Confirmed sales orders of the salesperson.")
     order_amount = fields.Monetary(
         string='Orders Amount (Untaxed)', currency_field='currency_id', readonly=True, aggregator='sum')
 
@@ -62,6 +66,7 @@ class CheckinmePerformanceReport(models.Model):
                 CASE WHEN COALESCE(c.is_new_customer, FALSE) THEN 1 ELSE 0 END AS new_customer_count,
                 COALESCE(c.duration, 0.0) AS duration,
                 COALESCE(c.sale_amount, 0.0) AS checkin_sale_amount,
+                CASE WHEN c.outcome = 'order' THEN 1 ELSE 0 END AS checkin_order_count,
                 0 AS order_count,
                 0.0 AS order_amount
             FROM checkinme_checkin c
@@ -92,12 +97,13 @@ class CheckinmePerformanceReport(models.Model):
                 0 AS new_customer_count,
                 0.0 AS duration,
                 0.0 AS checkin_sale_amount,
+                0 AS checkin_order_count,
                 1 AS order_count,
                 CASE WHEN COALESCE(so.currency_rate, 0) = 0 THEN so.amount_untaxed
                      ELSE so.amount_untaxed / so.currency_rate END AS order_amount
             FROM sale_order so
             JOIN res_company comp ON comp.id = so.company_id
-            JOIN hr_employee e ON e.user_id = so.user_id AND e.company_id = so.company_id AND e.active = TRUE
+            JOIN hr_employee e ON e.user_id = so.user_id AND e.company_id = so.company_id
             LEFT JOIN resource_resource rr ON rr.id = e.resource_id
             WHERE so.state = 'sale' AND so.user_id IS NOT NULL
         """

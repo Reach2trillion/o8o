@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from markupsafe import Markup, escape
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -129,6 +129,9 @@ class CheckinmeCheckin(models.Model):
         help="Check-in day in the salesperson's timezone (used for daily/weekly/monthly grouping).")
     checkout_time = fields.Datetime(string='Check-out Time', tracking=True, copy=False)
     duration = fields.Float(string='Duration (Hours)', compute='_compute_duration', store=True)
+    calendar_stop = fields.Datetime(
+        string='Calendar End', compute='_compute_calendar_stop', store=True,
+        help="Check-out time, or check-in time + 1 hour while the visit is open (used by the calendar view).")
 
     latitude = fields.Float(string='Latitude', digits=(10, 7), copy=False)
     longitude = fields.Float(string='Longitude', digits=(10, 7), copy=False)
@@ -162,6 +165,10 @@ class CheckinmeCheckin(models.Model):
         help="Untaxed amount of confirmed sales orders linked to this check-in, in company currency.")
     photo = fields.Image(string='Photo', max_width=1920, max_height=1920, copy=False)
     telegram_notified = fields.Boolean(string='Telegram Notified', copy=False, readonly=True)
+    telegram_pending_event = fields.Selection(
+        [('checkin', 'Check-in'), ('checkout', 'Check-out')], string='Telegram Pending Event',
+        copy=False, readonly=True, index=True,
+        help="Notification queued for the Telegram cron (sent a few seconds after the transaction is committed).")
 
     # ------------------------------------------------------------------
     # Compute
@@ -197,6 +204,14 @@ class CheckinmeCheckin(models.Model):
             else:
                 rec.duration = 0.0
 
+    @api.depends('checkin_time', 'checkout_time')
+    def _compute_calendar_stop(self):
+        for rec in self:
+            if rec.checkin_time and rec.checkout_time and rec.checkout_time > rec.checkin_time:
+                rec.calendar_stop = rec.checkout_time
+            else:
+                rec.calendar_stop = rec.checkin_time + timedelta(hours=1) if rec.checkin_time else False
+
     @api.depends('latitude', 'longitude')
     def _compute_has_location(self):
         for rec in self:
@@ -227,23 +242,36 @@ class CheckinmeCheckin(models.Model):
             rec.distance_to_partner = distance
             rec.location_status = 'verified' if distance <= max_distance else 'far'
 
-    @api.depends('partner_id', 'checkin_time')
+    @api.depends('partner_id', 'checkin_time', 'state', 'company_id')
     def _compute_is_new_customer(self):
-        """A customer is new when this is the earliest (non-cancelled) check-in recorded for it.
-        Ordering by (checkin_time, id) keeps the result deterministic whatever the compute timing."""
+        """A customer is new when this is the earliest check-in (checked in or done) recorded for it
+        in the company. Ordering by (checkin_time, id) keeps the result deterministic whatever the
+        compute timing; the other check-ins of the customer are recomputed on create / write / unlink."""
         for rec in self:
-            if not rec.partner_id:
+            if not rec.partner_id or rec.state not in ('checked_in', 'done'):
                 rec.is_new_customer = False
                 continue
-            domain = [('partner_id', '=', rec.partner_id.id), ('state', '!=', 'cancel')]
             origin_id = rec._origin.id
+            domain = [
+                ('partner_id', '=', rec.partner_id.id),
+                ('company_id', '=', rec.company_id.id),
+                ('state', 'in', ('checked_in', 'done')),
+            ]
             if origin_id:
                 domain.append(('id', '!=', origin_id))
             if rec.checkin_time:
-                earlier = ['|', ('checkin_time', '<', rec.checkin_time),
+                domain += ['|', ('checkin_time', '<', rec.checkin_time),
                            '&', ('checkin_time', '=', rec.checkin_time), ('id', '<', origin_id or 0)]
-                domain = domain + earlier
             rec.is_new_customer = not self.sudo().search_count(domain, limit=1)
+
+    def _recompute_new_customer_siblings(self, partners):
+        """Re-evaluate the 'new customer' flag of every check-in of these customers."""
+        partners = partners.filtered(lambda partner: partner.id)
+        if not partners:
+            return
+        siblings = self.sudo().search([('partner_id', 'in', partners.ids)])
+        if siblings:
+            self.env.add_to_compute(self._fields['is_new_customer'], siblings)
 
     @api.depends('sale_order_ids.state', 'sale_order_ids.amount_untaxed', 'sale_order_ids.currency_id')
     def _compute_sale_order_stats(self):
@@ -251,11 +279,13 @@ class CheckinmeCheckin(models.Model):
             orders = rec.sudo().sale_order_ids
             confirmed = orders.filtered(lambda so: so.state == 'sale')
             rec.sale_order_count = len(orders)
-            rec.order_amount = sum(
-                so.currency_id._convert(
-                    so.amount_untaxed, rec.currency_id, rec.company_id,
-                    (so.date_order or fields.Datetime.now()).date())
-                for so in confirmed)
+            rec.order_amount = sum(self._order_amount_company_currency(so) for so in confirmed)
+
+    @api.model
+    def _order_amount_company_currency(self, order):
+        """Untaxed amount of a sales order in company currency, using the rate stored on the order
+        (the same conversion as the SQL performance report)."""
+        return order.amount_untaxed / order.currency_rate if order.currency_rate else order.amount_untaxed
 
     @api.depends('name', 'partner_id.name')
     def _compute_display_name(self):
@@ -298,16 +328,39 @@ class CheckinmeCheckin(models.Model):
             if vals.get('state', 'checked_in') == 'checked_in' and not vals.get('checkin_time'):
                 vals['checkin_time'] = fields.Datetime.now()
         records = super().create(vals_list)
+        records._recompute_new_customer_siblings(records.partner_id)
         checked_in = records.filtered(lambda r: r.state == 'checked_in')
         checked_in._check_gps_required()
         checked_in._on_checked_in()
         return records
 
+    def write(self, vals):
+        if ('employee_id' in vals and not self.env.su
+                and not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager')):
+            employee = self.env['hr.employee'].sudo().browse(vals['employee_id'])
+            if employee and not (employee.user_id == self.env.user or employee.parent_id.user_id == self.env.user):
+                raise AccessError(_("You can only assign a check-in to yourself or to one of your direct reports."))
+        watched = {'partner_id', 'checkin_time', 'state', 'company_id'}
+        touched = bool(watched & set(vals))
+        partners = self.partner_id if touched else self.env['res.partner']
+        res = super().write(vals)
+        if touched:
+            self._recompute_new_customer_siblings(partners | self.partner_id)
+        return res
+
     def unlink(self):
         if (any(rec.state in ('checked_in', 'done') for rec in self)
                 and not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager')):
             raise UserError(_("Only managers can delete check-ins that have already been checked in."))
-        return super().unlink()
+        partners = self.partner_id
+        res = super().unlink()
+        self._recompute_new_customer_siblings(partners)
+        return res
+
+    def copy_data(self, default=None):
+        default = dict(default or {})
+        default.setdefault('state', 'draft')  # a duplicate is a planned visit, never an immediate check-in
+        return super().copy_data(default=default)
 
     # ------------------------------------------------------------------
     # Actions
@@ -390,6 +443,8 @@ class CheckinmeCheckin(models.Model):
 
     def action_send_telegram(self):
         """Manually (re)send the Telegram notification for these check-ins."""
+        if not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager'):
+            raise AccessError(_("Only CheckinMe managers can send Telegram notifications manually."))
         sent = 0
         for rec in self:
             event = 'checkout' if rec.state == 'done' else 'checkin'
@@ -455,19 +510,48 @@ class CheckinmeCheckin(models.Model):
         self._message_log(body=Markup('<br/>').join(parts))
 
     def _notify_telegram(self, event, force=False):
+        """Queue the Telegram notification of an event (sent by the queue cron right after this
+        transaction is committed), or send it immediately when forced / in synchronous mode."""
         self.ensure_one()
         if not force:
             key = 'checkinme.notify_checkin' if event == 'checkin' else 'checkinme.notify_checkout'
             if not self.env['checkinme.config']._get_bool(key, True):
                 return False
+        if force or self.env.context.get('checkinme_telegram_sync'):
+            return self._send_telegram_event(event)
+        self.write({'telegram_pending_event': event, 'telegram_notified': False})
+        self._trigger_telegram_queue()
+        return True
+
+    def _send_telegram_event(self, event):
+        self.ensure_one()
         try:
             ok = self.env['checkinme.telegram']._notify_checkin_event(self, event)
         except Exception:  # noqa: BLE001 - never block the salesperson because of Telegram
             _logger.exception("CheckinMe: Telegram notification failed for %s", self.name)
             ok = False
-        if ok and not self.telegram_notified:
-            self.write({'telegram_notified': True})
+        vals = {'telegram_notified': bool(ok)}
+        if self.telegram_pending_event == event:
+            vals['telegram_pending_event'] = False
+        self.write(vals)
         return ok
+
+    @api.model
+    def _trigger_telegram_queue(self):
+        cron = self.env.ref('checkinme_sales_activity.ir_cron_checkinme_telegram_queue', raise_if_not_found=False)
+        if cron:
+            cron.sudo()._trigger()
+
+    @api.model
+    def _cron_send_pending_telegram(self, limit=200):
+        """Send the queued check-in / check-out notifications. Triggered right after each event and
+        swept periodically as a safety net."""
+        pending = self.search([('telegram_pending_event', '!=', False)], limit=limit, order='id')
+        for rec in pending:
+            rec._send_telegram_event(rec.telegram_pending_event)
+        if len(pending) >= limit:
+            self._trigger_telegram_queue()
+        return True
 
     # ------------------------------------------------------------------
     # Period helpers
@@ -535,14 +619,19 @@ class CheckinmeCheckin(models.Model):
             domain.append(('employee_id', 'in', employees.ids))
         checkins = Checkin.search(domain)
 
+        sales_source = self.env['checkinme.config']._get_param('checkinme.sales_source', 'sale_order')
+        SaleOrder = self.env['sale.order'].sudo()
+        currency = company.currency_id
+
+        # Targets of the (last) month of the period: achievement lines are always month-to-date.
         Target = self.env['checkinme.target'].with_company(company)
         targets = Target.browse()
-        single_month = (date_from.year, date_from.month) == (date_to.year, date_to.month)
-        if with_targets and single_month:
+        target_month = date_to
+        if with_targets:
             tdomain = [
                 ('company_id', '=', company.id),
-                ('year', '=', date_from.year),
-                ('month', '=', str(date_from.month)),
+                ('year', '=', target_month.year),
+                ('month', '=', str(target_month.month)),
             ]
             if employees:
                 tdomain.append(('employee_id', 'in', employees.ids))
@@ -550,15 +639,23 @@ class CheckinmeCheckin(models.Model):
 
         if employees is None:
             employees = checkins.employee_id | targets.employee_id
+            if sales_source == 'sale_order':
+                # Salespeople with confirmed orders but no check-in / target in the period still count.
+                start, end = self._get_utc_bounds(date_from, date_to, company.partner_id.tz)
+                order_groups = SaleOrder._read_group([
+                    ('company_id', '=', company.id), ('state', '=', 'sale'), ('user_id', '!=', False),
+                    ('date_order', '>=', start), ('date_order', '<', end),
+                ], ['user_id'], ['__count'])
+                user_ids = [user.id for user, _count in order_groups]
+                if user_ids:
+                    order_employees = self.env['hr.employee'].sudo().search([
+                        ('user_id', 'in', user_ids), ('company_id', '=', company.id)])
+                    employees |= self.env['hr.employee'].browse(order_employees.ids)
         # Mirror the record rules: non-managers only ever see themselves and their direct reports.
         if not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager'):
             user = self.env.user
             employees = employees.filtered(lambda e: e.user_id == user or e.parent_id.user_id == user)
         employees = employees.sorted(lambda e: e.name or '')
-
-        sales_source = self.env['checkinme.config']._get_param('checkinme.sales_source', 'sale_order')
-        SaleOrder = self.env['sale.order'].sudo()
-        currency = company.currency_id
         rows = []
         for emp in employees:
             emp_checkins = checkins.filtered(lambda c: c.employee_id == emp)
@@ -576,11 +673,7 @@ class CheckinmeCheckin(models.Model):
                         ('date_order', '<', end),
                     ])
                 order_count = len(orders)
-                order_amount = sum(
-                    so.currency_id._convert(
-                        so.amount_untaxed, currency, company,
-                        (so.date_order or fields.Datetime.now()).date())
-                    for so in orders)
+                order_amount = sum(self._order_amount_company_currency(so) for so in orders)
             else:
                 orders = SaleOrder.browse()
                 order_count = len(emp_checkins.filtered(lambda c: c.outcome == 'order'))
@@ -634,6 +727,10 @@ class CheckinmeCheckin(models.Model):
             'sales_amount': sum(r['sales_amount'] for r in rows),
             'target_sales_amount': sum(r.get('target_sales_amount', 0.0) for r in rows),
             'target_visits': sum(r.get('target_visits', 0) for r in rows),
+            # month-to-date actuals of the targets (comparable with the monthly targets above)
+            'target_actual_sales_amount': sum(r['target'].actual_sales_amount for r in rows if r.get('target')),
+            'target_actual_visits': sum(r['target'].actual_visits for r in rows if r.get('target')),
+            'target_month': target_month,
         }
         return {
             'date_from': date_from,

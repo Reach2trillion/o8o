@@ -51,17 +51,17 @@
                         </tbody>
                     </table>
                     <p t-if="totals['target_sales_amount']" class="small mb-4">
-                        <strong>Team sales target:</strong>
-                        <span t-out="totals['sales_amount']"
+                        <strong>Team sales target (month to date):</strong>
+                        <span t-out="totals.get('target_actual_sales_amount', 0.0)"
                               t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
                         /
                         <span t-out="totals['target_sales_amount']"
                               t-options="{'widget': 'monetary', 'display_currency': summary['currency']}"/>
-                        (<t t-out="'%.0f' % (100.0 * totals['sales_amount'] / totals['target_sales_amount'])"/>%)
+                        (<t t-out="'%.0f' % (100.0 * totals.get('target_actual_sales_amount', 0.0) / totals['target_sales_amount'])"/>%)
                         <t t-if="totals['target_visits']">
-                            &#183; <strong>Team visits target:</strong>
-                            <t t-out="totals['visits']"/> / <t t-out="totals['target_visits']"/>
-                            (<t t-out="'%.0f' % (100.0 * totals['visits'] / totals['target_visits'])"/>%)
+                            &#183; <strong>Team visits target (month to date):</strong>
+                            <t t-out="totals.get('target_actual_visits', 0)"/> / <t t-out="totals['target_visits']"/>
+                            (<t t-out="'%.0f' % (100.0 * totals.get('target_actual_visits', 0) / totals['target_visits'])"/>%)
                         </t>
                     </p>
 
@@ -165,7 +165,7 @@
                         </t>
                         Visits are check-ins whose activity type counts as a field visit; "Verified" visits were checked in
                         within the configured distance of the customer's geolocation. Target percentages refer to the monthly
-                        target of the salesperson and are only shown when the period lies within a single month.
+                        target of the salesperson for the last month of the period and are always month to date.
                     </p>
 
                     <!-- Details -->

@@ -2,13 +2,18 @@
 """Telegram Bot API integration for CheckinMe (instant notifications and periodic reports)."""
 import html
 import logging
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta
 
+import pytz
 import requests
+from dateutil.relativedelta import relativedelta
 
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tools.misc import formatLang, format_date
+
+from .checkinme_checkin import safe_timezone
 
 _logger = logging.getLogger(__name__)
 
@@ -119,6 +124,18 @@ class CheckinmeTelegram(models.AbstractModel):
     def _escape(self, text):
         return html.escape(str(text or ''), quote=False)
 
+    @api.model
+    def _sanitize(self, text):
+        """Remove bot tokens from any text that may be logged, stored or shown to a user
+        (requests/urllib3 error messages embed the full request URL, i.e. /bot<TOKEN>/method)."""
+        text = str(text or '')
+        icp = self.env['ir.config_parameter'].sudo()
+        for key in BOT_TOKEN_PARAM_KEYS:
+            token = (icp.get_param(key) or '').strip()
+            if token:
+                text = text.replace(token, '***')
+        return re.sub(r'/bot[^/\s"\']+', '/bot***', text)
+
     # ------------------------------------------------------------------
     # Low level API
     # ------------------------------------------------------------------
@@ -130,10 +147,12 @@ class CheckinmeTelegram(models.AbstractModel):
             return False, {'ok': False, 'description': 'Telegram bot token is not configured.'}
         url = TELEGRAM_API_URL % (token, method)
         try:
+            # (connect timeout, read timeout): never hold a check-in for long when Telegram is unreachable
+            timeouts = (min(5, timeout), timeout)
             if files:
-                response = requests.post(url, data=payload or {}, files=files, timeout=timeout)
+                response = requests.post(url, data=payload or {}, files=files, timeout=timeouts)
             else:
-                response = requests.post(url, json=payload or {}, timeout=timeout)
+                response = requests.post(url, json=payload or {}, timeout=timeouts)
             try:
                 data = response.json()
             except ValueError:
@@ -143,8 +162,9 @@ class CheckinmeTelegram(models.AbstractModel):
                 data = {'ok': False, 'description': 'Unexpected response: %r' % (data,)}
             return bool(data.get('ok')), data
         except requests.RequestException as exc:
-            _logger.warning("CheckinMe Telegram: %s failed: %s", method, exc)
-            return False, {'ok': False, 'description': str(exc)}
+            message = "%s: %s" % (type(exc).__name__, self._sanitize(exc))
+            _logger.warning("CheckinMe Telegram: %s failed: %s", method, message)
+            return False, {'ok': False, 'description': message, 'transport_error': True}
 
     @api.model
     def _log(self, chat_id, message_type, message, ok, response, method='sendMessage',
@@ -156,8 +176,9 @@ class CheckinmeTelegram(models.AbstractModel):
                 'method': method,
                 'message': message,
                 'state': state or ('sent' if ok else 'failed'),
-                'response': (response.get('description') if isinstance(response, dict) and not ok
-                             else str(response)[:2000]) if response else False,
+                'response': self._sanitize(
+                    (response.get('description') if isinstance(response, dict) and not ok
+                     else str(response)[:2000]) if response else '') or False,
                 'checkin_id': checkin.id if checkin else False,
                 'employee_id': employee.id if employee else (checkin.employee_id.id if checkin else False),
                 'company_id': (checkin.company_id.id if checkin else self.env.company.id),
@@ -337,10 +358,10 @@ class CheckinmeTelegram(models.AbstractModel):
             esc(self._format_amount(totals['sales_amount'], currency)),
         ))
         if totals.get('target_sales_amount'):
-            pct = 100.0 * totals['sales_amount'] / totals['target_sales_amount']
+            pct = 100.0 * totals.get('target_actual_sales_amount', 0.0) / totals['target_sales_amount']
             lines.append("🎯 %s: %s / %s (%.0f%%)" % (
-                _('Team sales target'),
-                esc(self._format_amount(totals['sales_amount'], currency)),
+                _('Team sales target (month to date)'),
+                esc(self._format_amount(totals.get('target_actual_sales_amount', 0.0), currency)),
                 esc(self._format_amount(totals['target_sales_amount'], currency)), pct))
         lines.append("")
         if not summary['employees']:
@@ -390,8 +411,10 @@ class CheckinmeTelegram(models.AbstractModel):
         text = self._format_checkin_message(checkin, event)
         sent = False
         for chat_id in chat_ids:
-            ok, _response = self._send_message(chat_id, text, message_type=event, checkin=checkin)
+            ok, response = self._send_message(chat_id, text, message_type=event, checkin=checkin)
             if not ok:
+                if response.get('transport_error'):
+                    break  # Telegram unreachable: do not retry the other chats now
                 continue
             sent = True
             if event == 'checkin' and checkin.has_location and config._get_bool('checkinme.send_location_pin', True):
@@ -439,6 +462,32 @@ class CheckinmeTelegram(models.AbstractModel):
         return all(results)
 
     @api.model
+    def _align_report_crons(self, tz_name=None):
+        """Schedule the report crons in the (main) company's timezone: daily 18:00, weekly Monday
+        09:00 (previous week), monthly 1st 09:00 (previous month). Called by the post-install hook;
+        the times can still be changed in Settings > Technical > Scheduled Actions."""
+        tz = safe_timezone(tz_name or self.env.company.partner_id.tz or self.env.user.tz or 'UTC')
+        now_local = datetime.now(tz).replace(tzinfo=None)
+
+        def to_utc(local_dt):
+            return tz.localize(local_dt).astimezone(pytz.utc).replace(tzinfo=None)
+
+        daily = now_local.replace(hour=18, minute=0, second=0, microsecond=0)
+        if daily <= now_local:
+            daily += timedelta(days=1)
+        weekly = now_local.replace(hour=9, minute=0, second=0, microsecond=0) + relativedelta(days=1, weekday=0)
+        monthly = now_local.replace(day=1, hour=9, minute=0, second=0, microsecond=0) + relativedelta(months=1)
+        for xmlid, nextcall in (
+            ('checkinme_sales_activity.ir_cron_checkinme_daily_report', daily),
+            ('checkinme_sales_activity.ir_cron_checkinme_weekly_report', weekly),
+            ('checkinme_sales_activity.ir_cron_checkinme_monthly_report', monthly),
+        ):
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            if cron:
+                cron.sudo().write({'nextcall': to_utc(nextcall)})
+        return True
+
+    @api.model
     def _cron_daily_report(self):
         return self._run_scheduled_report('checkinme.daily_report', 'today', 'daily')
 
@@ -453,12 +502,15 @@ class CheckinmeTelegram(models.AbstractModel):
     @api.model
     def action_test_connection(self, chat_id=None):
         """Check the bot token (getMe) and send a test message to the managers' chat."""
+        if not (self.env.user.has_group('base.group_system')
+                or self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager')):
+            raise AccessError(_("Only CheckinMe managers can test the Telegram connection."))
         token = self._get_bot_token()
         if not token:
             raise UserError(_("Please configure the Telegram bot token first."))
         ok, info = self._api_call('getMe', token=token)
         if not ok:
-            raise UserError(_("Telegram rejected the bot token: %s", info.get('description', '')))
+            raise UserError(_("Telegram rejected the bot token: %s", self._sanitize(info.get('description', ''))))
         bot_name = info.get('result', {}).get('username') or info.get('result', {}).get('first_name', '')
         chat_id = (chat_id or self._get_default_chat_id() or '').strip()
         if not chat_id:
@@ -469,5 +521,5 @@ class CheckinmeTelegram(models.AbstractModel):
                            bot_name, self.env.company.name)))
         ok, response = self._send_message(chat_id, text, message_type='test')
         if not ok:
-            raise UserError(_("Could not send the test message: %s", response.get('description', '')))
+            raise UserError(_("Could not send the test message: %s", self._sanitize(response.get('description', ''))))
         return bot_name

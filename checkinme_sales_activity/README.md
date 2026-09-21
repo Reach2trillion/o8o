@@ -21,7 +21,7 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
 1. Copy `checkinme_sales_activity` into your addons path.
 2. Update the apps list and install **CheckinMe Sales Activity**.
 3. Give users one of the two access levels (Settings > Users > *CheckinMe Sales Activity*):
-   * **Salesperson** - creates own check-ins, sees own (and direct reports') check-ins, targets and reports.
+   * **Salesperson** - creates and edits own check-ins (planned visits may be deleted), reads the check-ins, targets and reports of direct reports.
    * **Manager** - full access, targets, activity types, Telegram settings and logs.
 4. Make sure every salesperson has an **Employee** record linked to their user (Employees app). Check-ins, targets and reports are attached to the employee; the employee's timezone is used to compute the check-in day.
 
@@ -35,16 +35,18 @@ Like every Odoo settings page, this one is only available to users with *Adminis
 2. Add the bot to the managers' group (or channel) and make sure it may post there.
 3. Find the **chat id** of the group (e.g. add [@userinfobot](https://t.me/userinfobot) / [@getidsbot](https://t.me/getidsbot) to the group, or read it from `https://api.telegram.org/bot<TOKEN>/getUpdates`). Group ids are negative numbers such as `-1001234567890`.
 4. Enter both values in *Settings > CheckinMe > Telegram Integration* and click **Test Connection**.
-5. Optional: give managers a personal chat id on their employee form (HR Settings tab > CheckinMe > *Telegram Chat ID*). When an employee checks in, the notification is sent to the managers' group **and** to the personal chat of the employee's manager and department manager.
+5. Optional: give managers a personal chat id on their employee form (Employees app > employee > *HR Settings* tab > CheckinMe > *Telegram Chat ID*; editing it requires HR *Officer* rights). When an employee checks in, the notification is sent to the managers' group **and** to the personal chat of the employee's manager and department manager. If your users already have a *Telegram Group ID* on their user record (from another Telegram module), it is used as a fallback.
 
-Notification toggles: check-in, check-out, location pin, photo. Automatic reports: daily (18:00 Phnom Penh / 11:00 UTC), weekly (Monday) and monthly (1st). The schedules are ordinary scheduled actions (*Settings > Technical > Scheduled Actions > CheckinMe: ...*) and can be changed there.
+Check-in and check-out notifications are queued and delivered by the scheduled action *CheckinMe: Send Queued Telegram Notifications* a few seconds after the record is saved, so a slow or unreachable Telegram never delays the salesperson; make sure the Odoo cron worker is running (it is on any standard deployment).
+
+Notification toggles: check-in, check-out, location pin, photo. Automatic reports: daily at 18:00, weekly on Monday at 09:00 (previous week) and monthly on the 1st at 09:00 (previous month), in the timezone of the main company at installation time. The schedules are ordinary scheduled actions (*Settings > Technical > Scheduled Actions > CheckinMe: ...*) and can be changed there.
 
 If another Telegram module already stores a bot token under `send_by_telegram.bot_token` or `abj.telegram.bot_token`, it is used as a fallback when no CheckinMe token is set.
 
 ### GPS verification
 
 * **Require GPS position to check in** (default on): a check-in cannot be saved without a captured position.
-* **Maximum distance** (default 500 m): a visit is *Verified on site* when the check-in position is within this distance of the customer's geolocation. Geolocate customers with the **Geolocate** button on the contact form (Contacts > Sales & Purchase tab, provided by `base_geolocalize`), or fill *Geo Latitude / Geo Longitude* manually.
+* **Maximum distance** (default 500 m): a visit is *Verified on site* when the check-in position is within this distance of the customer's geolocation. Geolocate customers on the contact form: *Partner Assignment* tab > Geolocation > **Compute based on address** (provided by `base_geolocalize`, uses OpenStreetMap or Google Maps as configured in General Settings), or fill *Geo Latitude / Geo Longitude* manually. Use *Recompute Location Check* on the check-in list after geolocating customers retroactively.
 
 ### KPI
 
@@ -55,8 +57,8 @@ If another Telegram module already stores a bot token under `send_by_telegram.bo
 1. Open Odoo in the phone browser or the Odoo mobile app and go to **CheckinMe > Check-ins > Check In Now**.
 2. The GPS position is captured automatically (allow location access when asked). Use **Capture GPS** to retry.
 3. Pick the customer and activity type, add the purpose, notes and a photo, then **Save**. Saving a *Checked In* record posts a note in the chatter and notifies the managers on Telegram.
-4. When leaving, open the visit and press **Check Out**: the check-out position and the visit duration are recorded.
-5. Managers can plan visits for the team in **Planned Visits**; the salesperson opens the planned visit on site and presses **Check In**.
+4. When leaving, open the visit and press **Check Out**: the position is captured at that moment and the visit duration is recorded.
+5. Managers can plan visits for the team in **Planned Visits**; the salesperson opens the planned visit on site and presses **Check In**, which captures the position right then (a check-in is refused without a GPS position when *Require GPS* is on).
 
 ## Reports
 

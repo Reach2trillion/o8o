@@ -34,7 +34,7 @@
                     <group>
                         <group name="group_period" string="Period">
                             <field name="employee_id" widget="many2one_avatar_employee" options="{'no_create': True}"/>
-                            <field name="year"/>
+                            <field name="year" options="{'enable_formatting': False}"/>
                             <field name="month"/>
                             <field name="company_id" groups="base.group_multi_company" options="{'no_create': True}"/>
                             <field name="date_from" readonly="1"/>
@@ -98,7 +98,7 @@
                 <field name="currency_id" column_invisible="1"/>
                 <field name="name"/>
                 <field name="employee_id" widget="many2one_avatar_employee"/>
-                <field name="year"/>
+                <field name="year" options="{'enable_formatting': False}"/>
                 <field name="month"/>
                 <field name="target_visits" sum="Total Target Visits"/>
                 <field name="actual_visits" sum="Total Visits"/>
@@ -133,7 +133,7 @@
         <field name="model">checkinme.target</field>
         <field name="arch" type="xml">
             <kanban class="o_checkinme_target_kanban o_kanban_mobile" sample="1" quick_create="false"
-                    default_order="year desc, month desc, employee_id">
+                    default_order="date_from desc, employee_id">
                 <field name="currency_id"/>
                 <field name="status"/>
                 <field name="is_current"/>
@@ -239,7 +239,7 @@
             <search string="Search Targets">
                 <field name="employee_id"/>
                 <field name="name"/>
-                <field name="year"/>
+                <field name="year" options="{'enable_formatting': False}"/>
                 <filter string="My Targets" name="filter_my" domain="[('user_id', '=', uid)]"/>
                 <filter string="My Team" name="filter_team" domain="[('employee_id.parent_id.user_id', '=', uid)]"/>
                 <separator/>
@@ -254,8 +254,8 @@
                 <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                 <group expand="0" string="Group By">
                     <filter string="Salesperson" name="group_employee" context="{'group_by': 'employee_id'}"/>
-                    <filter string="Year" name="group_year" context="{'group_by': 'year'}"/>
-                    <filter string="Month" name="group_month" context="{'group_by': 'month'}"/>
+                    <filter string="Year" name="group_year" context="{'group_by': 'date_from:year'}"/>
+                    <filter string="Month" name="group_month" context="{'group_by': 'date_from:month'}"/>
                     <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
                 </group>
             </search>
