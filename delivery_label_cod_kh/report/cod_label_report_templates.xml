@@ -137,6 +137,7 @@
             .o_kh_amount { font-weight: bold; }
             .o_kh_secondary { font-size: 12pt; font-weight: bold; padding-left: 2mm; }
             .o_kh_breakdown { font-size: 6.5pt; line-height: 1.3; white-space: nowrap; overflow: hidden; }
+            .o_kh_multi { font-weight: bold; }
             .o_kh_pay_caption { font-size: 7pt; font-weight: bold; line-height: 1.3; white-space: nowrap; overflow: hidden; text-align: right; }
             .o_kh_pay_cell { padding: 1.4mm 1.6mm !important; }
             .o_kh_paid_box { border: 0.9mm solid #000; }
@@ -150,10 +151,11 @@
             .o_kh_qr_cell { width: 25mm; padding: 1.5mm 1.5mm 0 1.5mm !important; text-align: center; }
             .o_kh_qr_cell .o_kh_qr { width: 16mm; height: 16mm; margin: 0 auto; }
             .o_kh_qr_caption { font-size: 6pt; line-height: 1.25; white-space: nowrap; overflow: hidden; text-align: center; padding-top: 0.3mm; }
-            /* payment QR: white cell = quiet zone of at least 1.5 mm around the code, even next to the black COD box */
-            .o_kh_payqr_cell { width: 21.7mm; padding: 1.6mm !important; background: #fff; text-align: center; vertical-align: middle !important; }
-            .o_kh_payqr { width: 18.4mm; height: 18.4mm; margin: 0 auto; }
-            .o_kh_payqr_img { max-width: 18.4mm; max-height: 18.4mm; margin: 0 auto; }
+            /* payment QR: the white cell is the quiet zone (1.7 mm on every side, also next to the
+               black COD box); 18 mm code + 2 x 1.7 mm = the 21.4 mm height of the section */
+            .o_kh_payqr_cell { width: 21.4mm; padding: 1.7mm !important; background: #fff !important; text-align: center; vertical-align: middle !important; }
+            .o_kh_payqr { width: 18mm; height: 18mm; margin: 0 auto; }
+            .o_kh_payqr_img { max-width: 18mm; max-height: 18mm; margin: 0 auto; }
 
             /* 4. items and instructions */
             .o_kh_items_cell { padding: 0.5mm 1.6mm 0 1.6mm !important; }
@@ -272,6 +274,9 @@
                     </div>
                     <div t-if="money['goods_str']" class="o_kh_breakdown">
                         ថ្លៃទំនិញ Goods <t t-out="money['goods_str']"/> + ថ្លៃដឹក Delivery <t t-out="money['fee_str']"/>
+                    </div>
+                    <div t-if="label['parcel_count'] &gt; 1" class="o_kh_breakdown o_kh_multi">
+                        សរុប <t t-out="label['parcel_count']"/> កញ្ចប់ ប្រមូលតែម្តង · Total for <t t-out="label['parcel_count']"/> parcels, collect once
                     </div>
                     <div t-if="pay_qr" class="o_kh_pay_caption">
                         <t t-out="pay_qr['caption']"/> &#9654;

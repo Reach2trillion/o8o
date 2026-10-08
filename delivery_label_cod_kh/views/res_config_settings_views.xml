@@ -34,15 +34,46 @@
                              help="Print '≈ 69,100៛' under the amount to collect (or the dollar equivalent for orders in riel).">
                         <field name="kh_label_show_khr"/>
                     </setting>
-                    <setting id="kh_label_qr_setting" string="Label QR Code" company_dependent="1"
-                             help="Google Maps location of the receiver (transfer reference when the contact has no geolocation), the transfer reference, the shop's static ABA KHQR (only when money must be collected) or nothing.">
+                    <setting id="kh_label_pay_qr_setting" string="Payment QR Code (COD)" company_dependent="1"
+                             help="'Scan to pay' QR code printed next to the amount on COD labels only (never on PAID / NO COD labels).">
+                        <div class="content-group">
+                            <div class="mt8">
+                                <field name="kh_label_pay_qr" widget="radio"/>
+                            </div>
+                            <div class="text-muted small mt4" invisible="kh_label_pay_qr != 'odoo_link'">
+                                The customer opens the payment page of the sales order with the amount to collect
+                                and pays with a published payment provider (e.g. ABA KHQR). The link uses the
+                                base URL of the database (System Parameter <code>web.base.url</code>): it must be
+                                the public address of your Odoo. Transfers without sales order print the static
+                                KHQR image below when it is set.
+                            </div>
+                            <div class="mt8" invisible="kh_label_pay_qr != 'odoo_link'">
+                                <button name="%(payment.action_payment_provider)d" type="action" icon="oi-arrow-right"
+                                        string="Payment Providers" class="btn-link"/>
+                            </div>
+                            <div class="row mt8" invisible="kh_label_pay_qr != 'custom_url'">
+                                <label for="kh_label_pay_url_template" string="URL" class="col-lg-2 o_light_label"/>
+                                <field name="kh_label_pay_url_template" class="col-lg-10"
+                                       placeholder="https://pay.example.com/?ref={order}&amp;amount={amount}&amp;ccy={currency}"/>
+                                <div class="text-muted small mt4">
+                                    Placeholders (URL-encoded): {order}, {picking}, {amount}, {currency}, {partner}.
+                                </div>
+                            </div>
+                            <div class="row mt8" invisible="kh_label_pay_qr not in ('khqr_image', 'odoo_link')">
+                                <label for="kh_label_khqr_image" class="col-lg-5 o_light_label"/>
+                                <field name="kh_label_khqr_image" widget="image" class="col-lg-3" options="{'size': [96, 96]}"/>
+                                <div class="text-muted small mt4" invisible="kh_label_pay_qr != 'khqr_image'">
+                                    Upload the square QR code itself (crop the ABA card): it prints 18 mm wide and the
+                                    customer types the amount shown under it.
+                                </div>
+                            </div>
+                        </div>
+                    </setting>
+                    <setting id="kh_label_qr_setting" string="Label Info QR Code" company_dependent="1"
+                             help="Google Maps location of the receiver (transfer reference when the contact has no geolocation), the transfer reference, or nothing. On COD labels with a payment QR code it moves to the receiver section.">
                         <div class="content-group">
                             <div class="mt8">
                                 <field name="kh_label_qr_content" widget="radio"/>
-                            </div>
-                            <div class="row mt8" invisible="kh_label_qr_content != 'khqr'">
-                                <label for="kh_label_khqr_image" class="col-lg-5 o_light_label"/>
-                                <field name="kh_label_khqr_image" widget="image" class="col-lg-3" options="{'size': [96, 96]}"/>
                             </div>
                         </div>
                     </setting>

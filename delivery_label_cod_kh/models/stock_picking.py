@@ -3,6 +3,7 @@ import base64
 import io
 import logging
 import re
+from urllib.parse import quote as url_quote
 
 from PIL import Image
 from reportlab.graphics.barcode.code128 import Code128
@@ -15,6 +16,7 @@ except ImportError:  # pragma: no cover - older reportlab
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
+from odoo.tools import float_repr
 from odoo.tools.image import image_data_uri
 
 from .kh_label_text import fit_width, pick_size, text_width_mm, truncate as kh_truncate
@@ -63,24 +65,53 @@ MAP_URL = 'https://maps.google.com/?q=%.7f,%.7f'
 # Usable text widths (mm) of the label boxes and font sizes (pt), mirrored from the template CSS.
 W_RECEIVER = 65.5       # receiver column next to the province box
 W_RECEIVER_FULL = 93.0  # receiver column when there is no province
+INFO_QR_CELL = 18.5     # info QR cell of the receiver section (when the payment QR takes its place)
+PROVINCE_CELL_SHRINK = 3.5  # the province box is narrower when the info QR sits next to it
 W_PROVINCE = 23.0       # inside the province box
-W_PAYMENT = 67.0        # COD box next to the QR code
+W_PAYMENT = 67.0        # COD box next to the info QR code
+W_PAYMENT_PAYQR = 70.5  # COD box next to the payment QR code
 W_PAYMENT_FULL = 92.0   # COD box without QR code
 W_ITEMS = 52.5          # items / note column next to the handling chips
 W_ITEMS_FULL = 93.0     # items / note column without chips
 NAME_SIZES = (13, 11, 9)
 PHONE_SIZES = (18, 16, 14, 12)
+PHONE_MIN_SIZE_SHARED = 16  # below this size the second phone number moves to its own line
 PHONE2_SIZE = 10
 AMOUNT_SIZES = (25, 22, 19, 16)
 AMOUNT_MAX_SIZE_MULTI_PARCEL = 21  # leaves room for the "total for N parcels" line
+# Height (mm) of the COD box: title line + amount line + optional small lines (fee breakdown,
+# "total for N parcels", "scan to pay" caption). The amount size is capped so everything fits.
+PAY_BOX_HEIGHT = 21.4 - 1.2  # section height minus the vertical padding of the black box
+PAY_TITLE_HEIGHT = 3.7
+PAY_SMALL_LINE_HEIGHT = 3.05
+AMOUNT_LINE_HEIGHT = 1.05 * 25.4 / 72.0  # mm per pt of the amount font (line-height 1.05)
 SECONDARY_SIZE = 12
 PROVINCE_SIZES = (15, 13, 11.5, 10)
 ADDRESS_SIZE = 8
+ADDRESS_LINES = 3
 ITEMS_SIZE = 6.5
 NOTE_SIZE = 7
+PAY_CAPTION_SIZE = 7
 ITEMS_TEXT_LINES = 3    # lines shared by the items summary and the note
 NOTE_PREFIX = 'ចំណាំ Note: '
 PROVINCE_PREFIXES = ('រាជធានី', 'ខេត្ត', 'ក្រុង')
+
+# Payment QR ("scan to pay") of COD labels, see the README.
+PAY_CAPTION = 'ស្កេនដើម្បីទូទាត់ · SCAN TO PAY'
+PAY_CAPTION_KHQR = 'ABA KHQR · ស្កេនដើម្បីទូទាត់ · SCAN TO PAY'
+PAY_QR_PIXELS = 660            # rendered size of the payment QR PNG (printed 18.4 mm wide)
+PAY_QR_LEVEL_M_MAX_BYTES = 106  # QR version 6 at level M; longer URLs use level L (less dense)
+INFO_QR_PIXELS = 360
+MAP_CAPTION_LINES = ('ស្កេនមើលទីតាំង', 'Scan for map')
+MAP_CAPTION_LINES_SHORT = ('ស្កេនមើលទីតាំង', 'MAP')
+PAY_URL_PLACEHOLDERS = ('order', 'picking', 'amount', 'currency', 'partner')
+
+
+class _KeepUnknownPlaceholders(dict):
+    """``str.format_map`` mapping that leaves unknown ``{placeholders}`` untouched."""
+
+    def __missing__(self, key):
+        return '{%s}' % key
 
 
 def kh_normalize_phone(text):
@@ -130,6 +161,11 @@ class StockPicking(models.Model):
     kh_cod_state = fields.Selection(
         COD_STATES, string='COD Status', compute='_compute_kh_cod')
     kh_cod_warning = fields.Char(string='COD Warning', compute='_compute_kh_cod_warning')
+    kh_payment_link = fields.Char(
+        string='Payment Link', compute='_compute_kh_payment_link',
+        help="Link encoded in the 'scan to pay' QR code of the COD label (Inventory > Settings > "
+             "COD Delivery Label > Payment QR Code): the payment page of the sales order for the "
+             "amount to collect, or the custom payment URL. Copy it to send it by Telegram or SMS.")
     kh_receiver_phone = fields.Char(
         string='Receiver Phone', compute='_compute_kh_receiver_phone', store=True, readonly=False,
         help="Phone number(s) printed on the label, taken from the contact's phone, mobile or from "
@@ -190,6 +226,14 @@ class StockPicking(models.Model):
             deliveries = picking._kh_get_ambiguous_deliveries()
             picking.kh_cod_warning = (
                 self._kh_ambiguity_message(picking.sudo().sale_id, deliveries) if deliveries else False)
+
+    @api.depends(
+        'kh_cod_state', 'kh_cod_amount', 'kh_cod_currency_id', 'partner_id.name',
+        'sale_id.partner_invoice_id', 'company_id.kh_label_pay_qr', 'company_id.kh_label_pay_url_template')
+    def _compute_kh_payment_link(self):
+        for picking in self:
+            mode, url = picking._kh_get_payment_url()
+            picking.kh_payment_link = url if mode in ('odoo_link', 'custom_url') else False
 
     @api.depends('partner_id', 'partner_id.name', 'partner_id.phone', 'partner_id.mobile',
                  'partner_id.commercial_partner_id.phone', 'partner_id.commercial_partner_id.mobile')
@@ -308,6 +352,89 @@ class StockPicking(models.Model):
                 messages.append(self._kh_ambiguity_message(order, deliveries))
         if messages:
             raise UserError('\n'.join(messages))
+
+    # ------------------------------------------------------------------
+    # Payment QR ("scan to pay", COD labels only)
+    # ------------------------------------------------------------------
+    def _kh_odoo_payment_link(self, amount):
+        """Standard Odoo payment link of the sales order for ``amount`` (order currency), or False.
+
+        Built with the ``payment.link.wizard`` of the sale module, exactly like *Sales > Order >
+        Generate a Payment Link*: ``{base_url}/payment/pay?amount=..&access_token=..&sale_order_id=..``
+        where the token signs the invoicing partner, the amount and the currency of the order. The
+        ``/payment/pay`` controller only checks that token (not the state of the order), so the link
+        works for confirmed orders. See ``payment_link_wizard.py`` for the token outside a request.
+        """
+        self.ensure_one()
+        order = self.sudo().sale_id
+        if not order:
+            return False
+        wizard = self.env['payment.link.wizard'].sudo().new({
+            'res_model': 'sale.order',
+            'res_id': order.id,
+            'amount': order.currency_id.round(amount),
+            'currency_id': order.currency_id.id,
+            'partner_id': order.partner_invoice_id.id,
+        })
+        return wizard.link or False
+
+    def _kh_custom_payment_url(self, template, amount, currency):
+        """Fill the custom payment URL ``template`` of the company.
+
+        Placeholders: ``{order}``, ``{picking}``, ``{amount}`` (e.g. ``17.00``), ``{currency}``
+        (``USD``) and ``{partner}`` (receiver name), each URL-encoded. Unknown placeholders and
+        malformed braces are left as typed: a wrong template never blocks the label.
+        """
+        self.ensure_one()
+        template = (template or '').strip()
+        if not template:
+            return False
+        order = self.sudo().sale_id
+        values = {
+            'order': order.name or self.origin or '',
+            'picking': self.name or '',
+            'amount': float_repr(currency.round(amount), max(currency.decimal_places, 0)),
+            'currency': currency.name or '',
+            'partner': self.sudo().partner_id.name or '',
+        }
+        quoted = {key: url_quote(str(value), safe='') for key, value in values.items()}
+        try:
+            return template.format_map(_KeepUnknownPlaceholders(quoted))
+        except (ValueError, IndexError, KeyError, AttributeError, TypeError):
+            # e.g. "{amount:.2f}", "{0}" or a lone "{": replace the known placeholders only
+            url = template
+            for key in PAY_URL_PLACEHOLDERS:
+                url = url.replace('{%s}' % key, quoted[key])
+            return url
+
+    def _kh_get_payment_url(self):
+        """Effective payment QR of the transfer: ``(mode, url)``.
+
+        ``mode`` is the company setting after fallbacks: ``'odoo_link'`` / ``'custom_url'`` with
+        their URL, ``'khqr_image'`` (static image, no URL) or ``False`` when no payment QR prints:
+        only COD labels with a positive amount get one. The Odoo link needs a sales order:
+        transfers without one use the static KHQR image when it is set, else print no payment QR.
+        """
+        self.ensure_one()
+        if self.kh_cod_state != 'cod' or not self._kh_is_cod_candidate():
+            return False, False
+        currency = self.kh_cod_currency_id
+        amount = currency.round(self.kh_cod_amount)
+        if currency.compare_amounts(amount, 0.0) <= 0:
+            return False, False
+        company = self.company_id or self.env.company
+        mode = company.kh_label_pay_qr
+        if mode == 'odoo_link':
+            url = self._kh_odoo_payment_link(amount)
+            if url:
+                return mode, url
+            mode = 'khqr_image'
+        if mode == 'custom_url':
+            url = self._kh_custom_payment_url(company.kh_label_pay_url_template, amount, currency)
+            return (mode, url) if url else (False, False)
+        if mode == 'khqr_image' and company.kh_label_khqr_image:
+            return mode, False
+        return False, False
 
     # ------------------------------------------------------------------
     # Receiver phone
@@ -448,8 +575,13 @@ class StockPicking(models.Model):
         """Company logo converted to grayscale (thermal printers dither colours), as a data URI."""
         if not company.logo or company.uses_default_logo:
             return False
+        return self._kh_grayscale_data_uri(company.logo)
+
+    @api.model
+    def _kh_grayscale_data_uri(self, image_base64, max_px=400):
+        """Grayscale PNG ``data:`` URI of a base64 image (transparency kept), at most ``max_px``."""
         try:
-            image = Image.open(io.BytesIO(base64.b64decode(company.logo)))
+            image = Image.open(io.BytesIO(base64.b64decode(image_base64)))
             image.load()
             if image.mode == 'P':
                 image = image.convert('RGBA')
@@ -459,18 +591,24 @@ class StockPicking(models.Model):
                 gray.putalpha(alpha)
             else:
                 gray = image.convert('L')
-            gray.thumbnail((400, 400))
+            gray.thumbnail((max_px, max_px))
             output = io.BytesIO()
             gray.save(output, format='PNG')
             return 'data:image/png;base64,%s' % base64.b64encode(output.getvalue()).decode()
         except Exception:  # noqa: BLE001 - SVG or unreadable image: print it as stored
-            return image_data_uri(company.logo)
+            return image_data_uri(image_base64)
 
     # ------------------------------------------------------------------
     # Label values
     # ------------------------------------------------------------------
-    def _kh_get_money_values(self, width_mm=W_PAYMENT):
-        """Payment block of the label: state, primary / secondary amounts and fee breakdown."""
+    def _kh_get_money_values(self, width_mm=W_PAYMENT, extra_lines=0):
+        """Payment block of the label: state, primary / secondary amounts and fee breakdown.
+
+        :param float width_mm: width of the COD box (depends on the QR code next to it)
+        :param int extra_lines: small lines printed in the COD box besides the fee breakdown
+            ("total for N parcels", "scan to pay" caption): the amount font is capped so that
+            every line fits the height of the box.
+        """
         self.ensure_one()
         company = self.company_id or self.env.company
         currency = self.kh_cod_currency_id
@@ -498,15 +636,17 @@ class StockPicking(models.Model):
             else:
                 amount_khr = company._kh_round_khr(company._kh_to_khr(amount, currency))
                 values['secondary_str'] = '≈ %s' % self._kh_format_amount(amount_khr, company._kh_get_khr_currency())
-        secondary_mm = text_width_mm(values['secondary_str'], SECONDARY_SIZE, bold=True) + 2.0
-        values['amount_size'] = pick_size(
-            values['amount_str'], width_mm - secondary_mm, AMOUNT_SIZES, bold=True)
         order = self.sudo().sale_id
         if self.kh_payment_mode == 'auto' and order:
             fee = currency.round(self._kh_get_delivery_fee(order))
             if currency.compare_amounts(fee, 0.0) > 0:
                 values['goods_str'] = self._kh_format_amount(order.amount_total - fee, currency)
                 values['fee_str'] = self._kh_format_amount(fee, currency)
+        small_lines = extra_lines + (1 if values['fee_str'] else 0)
+        max_size = (PAY_BOX_HEIGHT - PAY_TITLE_HEIGHT - small_lines * PAY_SMALL_LINE_HEIGHT) / AMOUNT_LINE_HEIGHT
+        sizes = tuple(size for size in AMOUNT_SIZES if size <= max_size) or AMOUNT_SIZES[-1:]
+        secondary_mm = text_width_mm(values['secondary_str'], SECONDARY_SIZE, bold=True) + 2.0
+        values['amount_size'] = pick_size(values['amount_str'], width_mm - secondary_mm, sizes, bold=True)
         return values
 
     def _kh_get_label_items(self, max_lines, width_mm=W_ITEMS_FULL, lines=3):
@@ -567,22 +707,71 @@ class StockPicking(models.Model):
             return ''
         return '%s %s' % (('%.2f' % weight).rstrip('0').rstrip('.'), self.weight_uom_name or 'kg')
 
-    def _kh_label_qr(self, company, money_state):
-        """``(data_uri, caption)`` of the QR slot according to the company setting."""
+    def _kh_label_info_qr(self, company):
+        """Information QR code (``kh_label_qr_content``): Google Maps link of the receiver or reference.
+
+        :return: ``{'kind': 'map'|'reference', 'value': encoded text, 'image': data URI}`` or False
+        """
         self.ensure_one()
         mode = company.kh_label_qr_content
-        if mode == 'none':
-            return False, ''
-        partner = self.partner_id
-        if mode == 'khqr' and money_state == 'cod' and company.kh_label_khqr_image:
-            return image_data_uri(company.kh_label_khqr_image), 'ABA KHQR'
+        if mode not in ('map', 'reference'):
+            return False
+        partner = self.partner_id.sudo()
         if mode == 'map' and partner and (partner.partner_latitude or partner.partner_longitude):
             url = MAP_URL % (partner.partner_latitude, partner.partner_longitude)
-            qr = self._kh_barcode_data_uri('QR', url, width=360, height=360, quiet=0, barBorder=2)
-            if qr:
-                return qr, 'ស្កេនមើលទីតាំង\nScan for map'
-        qr = self._kh_barcode_data_uri('QR', self.name, width=360, height=360, quiet=0, barBorder=2)
-        return qr, kh_truncate(self.name, MAX_REFERENCE) if qr else ''
+            image = self._kh_barcode_data_uri(
+                'QR', url, width=INFO_QR_PIXELS, height=INFO_QR_PIXELS, quiet=0, barBorder=2)
+            if image:
+                return {'kind': 'map', 'value': url, 'image': image}
+        # reference mode, or map mode for a contact without geolocation
+        image = self._kh_barcode_data_uri(
+            'QR', self.name, width=INFO_QR_PIXELS, height=INFO_QR_PIXELS, quiet=0, barBorder=2)
+        return {'kind': 'reference', 'value': self.name, 'image': image} if image else False
+
+    def _kh_label_pay_qr(self, company):
+        """Payment QR code of a COD label (see :meth:`_kh_get_payment_url`).
+
+        :return: ``{'mode', 'url', 'image', 'caption', 'amount_str'}`` or False. ``url`` is False
+            for the static KHQR image. The QR codes are drawn without border: the white cell of the
+            template is their quiet zone (>= 1.6 mm, also next to the black COD box). Long URLs use
+            the error correction level L, which keeps the modules large enough for 203 dpi.
+        """
+        self.ensure_one()
+        mode, url = self._kh_get_payment_url()
+        if not mode:
+            return False
+        amount_str = self._kh_format_amount(self.kh_cod_amount, self.kh_cod_currency_id)
+        if mode == 'khqr_image':
+            image = self._kh_grayscale_data_uri(company.kh_label_khqr_image, max_px=512)
+            caption = PAY_CAPTION_KHQR
+        else:
+            level = 'M' if len(url.encode()) <= PAY_QR_LEVEL_M_MAX_BYTES else 'L'
+            image = self._kh_barcode_data_uri(
+                'QR', url, width=PAY_QR_PIXELS, height=PAY_QR_PIXELS, quiet=1, barLevel=level)
+            caption = PAY_CAPTION
+        if not image:
+            return False
+        # the template appends " ▶" (pointing at the QR code)
+        width = W_PAYMENT_PAYQR - text_width_mm(' ▶', PAY_CAPTION_SIZE, bold=True)
+        return {
+            'mode': mode,
+            'url': url,
+            'image': image,
+            'caption': fit_width('%s %s' % (caption, amount_str), width, PAY_CAPTION_SIZE, bold=True),
+            'amount_str': amount_str,
+        }
+
+    def _kh_info_qr_place(self, info_qr, pay_qr):
+        """Where the information QR prints: ``'payment'`` (QR slot of the payment section),
+        ``'receiver'`` (next to the province, when the payment QR takes the slot) or False.
+
+        Hook: return False when ``pay_qr`` is set to omit the information QR on COD labels with a
+        payment QR (the payment QR always wins the space).
+        """
+        self.ensure_one()
+        if not info_qr:
+            return False
+        return 'receiver' if pay_qr else 'payment'
 
     @api.model
     def _kh_split_province(self, province):
@@ -592,8 +781,12 @@ class StockPicking(models.Model):
                 return prefix, province[len(prefix):].strip()
         return '', province
 
-    def _kh_receiver_values(self, partner, company):
-        """Receiver block: cleaned name, phones, address and province with their font sizes."""
+    def _kh_receiver_values(self, partner, company, with_info_qr=False):
+        """Receiver block: cleaned name, phones, address and province with their font sizes.
+
+        :param bool with_info_qr: the information QR code prints in the receiver section (next to
+            the province box, which is then narrower), so the texts get less room.
+        """
         self.ensure_one()
         raw_name = partner.name or partner.commercial_partner_id.name or partner.display_name or ''
         phones = [phone.strip() for phone in PHONE_SPLIT_RE.split(self.kh_receiver_phone or '') if phone.strip()][:2]
@@ -607,27 +800,42 @@ class StockPicking(models.Model):
             address_parts.append(partner.country_id.name)
         province = kh_truncate(province, MAX_PROVINCE)
         width = W_RECEIVER if province else W_RECEIVER_FULL
+        province_width = W_PROVINCE
+        if with_info_qr:
+            width -= (INFO_QR_CELL - PROVINCE_CELL_SHRINK) if province else INFO_QR_CELL
+            province_width -= PROVINCE_CELL_SHRINK
 
         name = kh_truncate(self._kh_clean_receiver_name(raw_name), MAX_NAME)
         name_size = pick_size(name, width, NAME_SIZES, bold=True)
         name = fit_width(name, width, name_size, bold=True)
 
-        phone_size, phone2_size = PHONE_SIZES[0], PHONE2_SIZE
+        # One phone line; a second number shares it unless the first one would get too small,
+        # then it moves to its own line (and the address keeps one line less).
+        phone_size, phone2_size, phone2_line = PHONE_SIZES[0], PHONE2_SIZE, False
         if phones:
-            second_mm = text_width_mm(' / ' + phones[1], PHONE2_SIZE, bold=True) if len(phones) > 1 else 0.0
-            phone_size = pick_size('☎ ' + phones[0], width - second_mm, PHONE_SIZES, bold=True)
+            first = '☎ ' + phones[0]
+            phone_size = pick_size(first, width, PHONE_SIZES, bold=True)
+            if len(phones) > 1:
+                second_mm = text_width_mm(' / ' + phones[1], PHONE2_SIZE, bold=True)
+                shared_size = pick_size(first, width - second_mm, PHONE_SIZES, bold=True)
+                fits = text_width_mm(first, shared_size, bold=True) + second_mm <= width
+                if fits and shared_size >= PHONE_MIN_SIZE_SHARED:
+                    phone_size = shared_size
+                else:
+                    phone2_line = True
 
         address = kh_truncate(', '.join(part.strip() for part in address_parts if part and part.strip()), MAX_ADDRESS)
-        address = fit_width(address, width, ADDRESS_SIZE, lines=3)
+        address = fit_width(address, width, ADDRESS_SIZE, lines=ADDRESS_LINES - (1 if phone2_line else 0))
 
         prefix, main = self._kh_split_province(province)
-        province_size = pick_size(main, W_PROVINCE, PROVINCE_SIZES, bold=True)
+        province_size = pick_size(main, province_width, PROVINCE_SIZES, bold=True)
         return {
             'receiver_name': name,
             'name_size': name_size,
             'phones': phones,
             'phone_size': phone_size,
             'phone2_size': phone2_size,
+            'phone2_line': phone2_line,
             'address': address,
             'province': province,
             'province_prefix': prefix,
@@ -652,10 +860,27 @@ class StockPicking(models.Model):
             }
         company_values = cache[company.id]
 
-        # Payment and QR code
-        qr_state = self.kh_cod_state
-        qr, qr_caption = self._kh_label_qr(company, qr_state)
-        money = self._kh_get_money_values(W_PAYMENT if qr else W_PAYMENT_FULL)
+        # QR codes: the payment QR (COD labels only) takes the QR slot of the payment section,
+        # the information QR (map / reference) then moves to the receiver section.
+        pay_qr = self._kh_label_pay_qr(company)
+        info_qr = self._kh_label_info_qr(company)
+        info_place = self._kh_info_qr_place(info_qr, pay_qr)
+        if not info_place:
+            info_qr = False
+        if pay_qr:
+            pay_width = W_PAYMENT_PAYQR
+        elif info_place == 'payment':
+            pay_width = W_PAYMENT
+        else:
+            pay_width = W_PAYMENT_FULL
+        parcel_count = min(max(self.kh_parcel_count or 1, 1), MAX_PARCELS)
+        money = self._kh_get_money_values(pay_width, extra_lines=(parcel_count > 1) + bool(pay_qr))
+        if info_qr and info_qr['kind'] == 'map':
+            caption_lines = MAP_CAPTION_LINES_SHORT if info_place == 'receiver' else MAP_CAPTION_LINES
+        elif info_qr:
+            caption_lines = (kh_truncate(info_qr['value'], MAX_REFERENCE),)
+        else:
+            caption_lines = ()
 
         # Items and handling instructions: the note has priority over the items summary
         has_chips = self.kh_fragile or self.kh_allow_check
@@ -679,7 +904,7 @@ class StockPicking(models.Model):
                 company.kh_label_max_item_lines, width_mm=items_width, lines=items_lines)
 
         # Several parcels: the amount is the total of the shipment, to collect once
-        if self.kh_parcel_count and self.kh_parcel_count > 1 and money['state'] == 'cod':
+        if parcel_count > 1 and money['state'] == 'cod':
             money['amount_size'] = min(money['amount_size'], AMOUNT_MAX_SIZE_MULTI_PARCEL)
 
         values = {
@@ -695,10 +920,13 @@ class StockPicking(models.Model):
             'date': self._kh_label_date(),
             'courier': kh_truncate(self._kh_label_courier(), MAX_COURIER),
             'weight': self._kh_label_weight(),
-            # payment
+            # payment and QR codes
             'money': money,
-            'qr': qr,
-            'qr_caption': qr_caption,
+            'pay_qr': pay_qr,
+            'info_qr': info_qr and info_qr['image'],
+            'info_qr_kind': info_qr and info_qr['kind'],
+            'info_qr_place': info_place,
+            'info_qr_caption_lines': caption_lines,
             # items & instructions
             'show_items': show_items,
             'items': items,
@@ -713,7 +941,7 @@ class StockPicking(models.Model):
             'barcode': self._kh_barcode_data_uri('Code128', self.name, width=1400, height=160, quiet=0),
             'footer': kh_truncate(company.kh_label_footer, MAX_FOOTER),
         }
-        values.update(self._kh_receiver_values(partner, company))
+        values.update(self._kh_receiver_values(partner, company, with_info_qr=info_place == 'receiver'))
         return values
 
     def _kh_get_label_values(self):
