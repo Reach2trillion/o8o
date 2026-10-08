@@ -5,22 +5,27 @@
          COD Delivery Label 100 x 80 mm
          Values come from report/cod_label_report.py -> labels: list of dicts built by
          stock.picking._kh_get_label_values() (one dict per parcel). Texts are already truncated
-         to the width of their box and font sizes are chosen in Python (kh_label_text.py).
+         to the width of their box, and font sizes, line heights and heights of the text boxes
+         are computed in Python (kh_label_text.py) and passed as inline styles.
 
          Renderer notes (wkhtmltopdf 0.12.6, old Qt WebKit):
-           * no flexbox / grid / CSS variables; fixed-layout tables, absolute mm heights,
+           * no flexbox / grid / CSS variables; fixed-layout tables, absolute heights,
              overflow:hidden boxes as a safety net;
-           * black and white only (no grey: thermal printers dither it), borders >= 0.3 mm,
-             fonts >= 6 pt; Khmer glyphs come from the Khmer fonts of the fallback stack;
+           * every length is truncated to whole CSS pixels (96 dpi, 1 px = 0.265 mm): the layout
+             is written in pixels, borders are 2 px (0.53 mm) or 4 px (1.06 mm);
+           * the baseline of a line is placed with the metrics of Arial whatever the font of the
+             glyphs: Khmer stacks need taller boxes (see kh_label_text.text_box);
+           * black and white only (no grey: thermal printers dither it), fonts >= 6 pt; Khmer
+             glyphs come from the Khmer fonts of the fallback stack;
            * one div.article per label: every label is rendered as its own document, i.e. its
              own page (N labels -> N pages, never a trailing blank page). The style sheet is
              inside the article so each document is self-contained.
          Avoid the CSS classes "header", "footer" and "article" inside the label: Odoo moves
          such divs out of the page body.
 
-         Vertical budget (inner height 76.2 mm = 77 mm - 2 x 0.4 mm border), each section height
-         includes its 0.3 mm bottom rule:
-           header 11 | receiver 25.7 | payment 22.1 | items 9.6 | footer 7.8
+         Page 378 x 302 px. Label 366 x 291 px at 6 px from the top / left edges (1.6 mm on every
+         side), 2 px frame. Vertical budget inside the frame (287 px), bottom rules included:
+           header 42 | receiver 99 | payment 82 | items 38 | footer 26
          ================================================================ -->
 
     <template id="report_cod_label_style">
@@ -36,7 +41,7 @@
             }
             .o_kh_page {
                 margin: 0;
-                padding: 1.5mm 0 0 1.5mm;
+                padding: 6px 0 0 6px;
                 page-break-inside: avoid;
             }
             .o_kh_label, .o_kh_label * {
@@ -45,10 +50,10 @@
             }
             .o_kh_label {
                 position: relative;
-                width: 97mm;
-                height: 77mm;
+                width: 366px;
+                height: 291px;
                 overflow: hidden;
-                border: 0.4mm solid #000;
+                border: 2px solid #000;
                 background: #fff;
                 color: #000;
                 font-family: Arial, 'Liberation Sans', 'DejaVu Sans', 'Khmer OS Battambang', 'Khmer OS Siemreap', 'Noto Sans Khmer', 'Khmer OS', sans-serif;
@@ -57,6 +62,13 @@
                 text-align: left;
                 word-wrap: break-word;
             }
+            /* wkhtmltopdf only uses the first installed font of a stack (Arial above): Khmer runs
+               are wrapped in their own spans (kh() in Python, static captions here). Regular text
+               in Khmer OS Battambang, bold text in Noto Sans Khmer, which has a real bold face:
+               the thin strokes of a regular face break up on a 203 dpi printer, worst in white on
+               black. */
+            .o_kh_label .o_kh_kh { font-family: 'Khmer OS Battambang', 'Khmer OS Siemreap', 'Noto Sans Khmer', 'Khmer OS', sans-serif; }
+            .o_kh_label .o_kh_kb { font-family: 'Noto Sans Khmer', 'Khmer OS Battambang', 'Khmer OS Siemreap', 'Khmer OS', sans-serif; font-weight: bold; }
             .o_kh_label table {
                 width: 100%;
                 table-layout: fixed;
@@ -80,112 +92,111 @@
                 border: 0 none;
             }
             .o_kh_label img { display: block; border: 0; }
-            .o_kh_nowrap { white-space: nowrap; overflow: hidden; }
+            .o_kh_line { white-space: nowrap; overflow: hidden; }
+            /* texts broken into rows in Python (kh_label_text.wrap_lines): one row per line */
+            .o_kh_rows { white-space: nowrap; overflow: hidden; }
+            .o_kh_bold { font-weight: bold; }
             .o_kh_center { text-align: center; }
-            .o_kh_right { text-align: right; }
             .o_kh_middle { vertical-align: middle !important; }
-            .o_kh_sep { border-left: 0.3mm solid #000 !important; }
-            .o_kh_pad { padding: 0.4mm 1.6mm !important; }
+            .o_kh_sep { border-left: 2px solid #000 !important; }
 
-            /* sections */
-            .o_kh_sec { position: relative; overflow: hidden; border-bottom: 0.3mm solid #000; }
-            .o_kh_sec_head { height: 11mm; }
-            .o_kh_sec_head table.o_kh_cols { height: 10.7mm; }
-            .o_kh_sec_recv { height: 25.7mm; }
-            .o_kh_sec_recv table.o_kh_cols { height: 25.4mm; }
-            .o_kh_sec_pay { height: 22.1mm; }
-            .o_kh_sec_pay table.o_kh_cols { height: 21.8mm; }
-            .o_kh_sec_items { height: 9.6mm; }
-            .o_kh_sec_items table.o_kh_cols { height: 9.3mm; }
-            .o_kh_sec_foot { height: 7.8mm; border-bottom: 0; }
-            .o_kh_sec_foot table.o_kh_cols { height: 7.8mm; }
+            /* sections (heights include the 2 px bottom rule) */
+            .o_kh_sec { position: relative; overflow: hidden; border-bottom: 2px solid #000; }
+            .o_kh_sec_head { height: 42px; }
+            .o_kh_sec_head table.o_kh_cols { height: 40px; }
+            .o_kh_sec_recv { height: 99px; }
+            .o_kh_sec_recv table.o_kh_cols { height: 97px; }
+            .o_kh_sec_pay { height: 82px; }
+            .o_kh_sec_pay table.o_kh_cols { height: 80px; }
+            .o_kh_sec_items { height: 38px; }
+            .o_kh_sec_items table.o_kh_cols { height: 36px; }
+            .o_kh_sec_foot { height: 26px; border-bottom: 0; }
+            .o_kh_sec_foot table.o_kh_cols { height: 26px; }
 
             /* 1. header */
-            .o_kh_logo_cell { width: 11mm; }
-            .o_kh_logo { max-width: 10mm; max-height: 9.6mm; }
-            .o_kh_company { font-size: 9pt; font-weight: bold; line-height: 1.15; height: 3.7mm; white-space: nowrap; overflow: hidden; }
-            .o_kh_tagline { font-size: 6pt; line-height: 1.3; height: 2.8mm; white-space: nowrap; overflow: hidden; }
-            .o_kh_cphone { font-size: 7.5pt; font-weight: bold; line-height: 1.2; white-space: nowrap; overflow: hidden; }
-            .o_kh_ref { font-size: 8.5pt; font-weight: bold; line-height: 1.2; white-space: nowrap; overflow: hidden; }
-            .o_kh_meta { font-size: 6.5pt; line-height: 1.3; white-space: nowrap; overflow: hidden; }
-            .o_kh_courier { font-size: 7pt; font-weight: bold; line-height: 1.25; height: 3.1mm; white-space: nowrap; overflow: hidden; }
-            .o_kh_parcel_label { font-size: 6pt; line-height: 1.3; white-space: nowrap; overflow: hidden; }
-            .o_kh_parcel_line { line-height: 1.1; white-space: nowrap; overflow: hidden; }
-            .o_kh_parcel { font-size: 10pt; font-weight: bold; }
+            .o_kh_head_cell { padding: 0 4px 0 6px !important; }
+            .o_kh_logo_cell { width: 42px; }
+            .o_kh_logo { max-width: 38px; max-height: 38px; }
+            .o_kh_company { font-weight: bold; }
+            /* not clipped: its vowels may rise into the descent of the company name */
+            .o_kh_tagline { white-space: nowrap; }
+            .o_kh_cphone { font-weight: bold; }
+            .o_kh_ref { font-weight: bold; }
+            .o_kh_courier { font-weight: bold; }
+            .o_kh_parcel_line { font-size: 10pt; line-height: 14px; height: 14px; white-space: nowrap; overflow: hidden; }
+            .o_kh_parcel { font-weight: bold; }
             .o_kh_weight { font-size: 6.5pt; }
 
             /* 2. receiver */
-            .o_kh_recv_cell { padding: 0.5mm 1.6mm 0.2mm 1.6mm !important; }
-            .o_kh_tag { font-size: 6pt; font-weight: bold; line-height: 1.25; height: 2.65mm; white-space: nowrap; overflow: hidden; }
-            .o_kh_name { font-weight: bold; line-height: 1.15; height: 5.3mm; white-space: nowrap; overflow: hidden; }
-            .o_kh_phone { font-weight: bold; line-height: 1.0; height: 6.5mm; padding-top: 0.2mm; white-space: nowrap; overflow: hidden; }
+            .o_kh_recv_cell { padding: 2px 6px 0 6px !important; }
+            .o_kh_tag { font-size: 6pt; font-weight: bold; line-height: 10px; height: 11px; }
+            .o_kh_name { font-weight: bold; }
+            .o_kh_phone { font-weight: bold; }
             .o_kh_phone_icon { font-size: 11pt; }
-            .o_kh_phone2_line { font-size: 10pt; font-weight: bold; line-height: 1.15; height: 3.9mm; white-space: nowrap; overflow: hidden; }
-            .o_kh_blank { display: inline-block; border-bottom: 0.3mm solid #000; height: 4mm; vertical-align: baseline; }
-            .o_kh_address { font-size: 8pt; line-height: 1.2; height: 10.2mm; overflow: hidden; }
-            .o_kh_address_2 { height: 6.8mm; }
-            .o_kh_address_blank { font-size: 7pt; line-height: 1.6; height: 10.2mm; overflow: hidden; }
-            .o_kh_province_cell { width: 27.5mm; padding: 1mm 1.2mm 1mm 0 !important; }
-            .o_kh_with_info .o_kh_province_cell { width: 24mm; padding-right: 0 !important; }
-            .o_kh_province_box { border: 0.5mm solid #000; }
-            .o_kh_province_box table { height: 22.4mm; }
-            .o_kh_province_label { font-size: 6pt; font-weight: bold; line-height: 1.3; white-space: nowrap; overflow: hidden; }
-            .o_kh_province_prefix { font-size: 7.5pt; font-weight: bold; line-height: 1.3; }
-            .o_kh_province_name { font-weight: bold; line-height: 1.3; padding: 0 0.25mm; overflow: hidden; }
-            .o_kh_info_cell { width: 18.5mm; padding: 1.5mm 1.5mm 0 1.5mm !important; text-align: center; }
-            .o_kh_info_cell .o_kh_qr { width: 14.5mm; height: 14.5mm; margin: 0 auto; }
+            .o_kh_phone2_line { font-weight: bold; }
+            .o_kh_blank { display: inline-block; border-bottom: 2px solid #000; height: 10px; vertical-align: baseline; }
+            .o_kh_address { overflow: hidden; }
+            .o_kh_province_cell { padding: 4px 6px 4px 0 !important; }
+            .o_kh_province_box { border: 2px solid #000; }
+            .o_kh_province_box table { height: 85px; }
+            .o_kh_province_box td { padding: 0 2px !important; }
+            .o_kh_province_label { font-size: 6pt; font-weight: bold; line-height: 10px; height: 12px; padding-top: 1px; white-space: nowrap; overflow: hidden; }
+            .o_kh_province_prefix { font-size: 7.5pt; font-weight: bold; line-height: 13px; height: 15px; padding-top: 1px; }
+            .o_kh_province_name { font-weight: bold; overflow: hidden; }
+            .o_kh_province_city { font-weight: bold; overflow: hidden; }
+            /* info QR next to the province box: 6 px quiet zone around the 57 px (15 mm) code */
+            .o_kh_info_cell { padding: 6px 6px 0 6px !important; text-align: center; }
+            .o_kh_info_cell .o_kh_qr { width: 57px; height: 57px; margin: 0 auto 6px auto; }
 
             /* 3. payment */
-            .o_kh_pay_cod { background: #000 !important; color: #fff !important; padding: 0.6mm 2mm !important; vertical-align: middle !important; }
+            .o_kh_pay_cod { background: #000 !important; color: #fff !important; padding: 2px 8px !important; vertical-align: middle !important; }
             .o_kh_pay_cod * { color: #fff !important; }
-            .o_kh_pay_title { font-size: 8pt; font-weight: bold; line-height: 1.3; white-space: nowrap; overflow: hidden; }
-            .o_kh_amount_line { white-space: nowrap; overflow: hidden; line-height: 1.05; }
+            .o_kh_pay_title { font-size: 8pt; font-weight: bold; line-height: 13px; height: 17px; padding-top: 1px; white-space: nowrap; overflow: hidden; }
+            .o_kh_amount_line { white-space: nowrap; overflow: hidden; }
             .o_kh_amount { font-weight: bold; }
-            .o_kh_secondary { font-size: 12pt; font-weight: bold; padding-left: 2mm; }
-            .o_kh_breakdown { font-size: 6.5pt; line-height: 1.3; white-space: nowrap; overflow: hidden; }
-            .o_kh_multi { font-weight: bold; }
-            .o_kh_pay_caption { font-size: 7pt; font-weight: bold; line-height: 1.3; white-space: nowrap; overflow: hidden; text-align: right; }
-            .o_kh_pay_cell { padding: 1.4mm 1.6mm !important; }
-            .o_kh_paid_box { border: 0.9mm solid #000; }
-            .o_kh_paid_box table { height: 16.8mm; }
-            .o_kh_paid_title { font-size: 15pt; font-weight: bold; line-height: 1.25; white-space: nowrap; }
-            .o_kh_paid_sub { font-size: 8.5pt; font-weight: bold; line-height: 1.3; white-space: nowrap; }
-            .o_kh_none_box { border: 0.3mm solid #000; }
-            .o_kh_none_box table { height: 18mm; }
-            .o_kh_none_title { font-size: 12pt; font-weight: bold; line-height: 1.3; white-space: nowrap; }
-            .o_kh_none_sub { font-size: 7pt; line-height: 1.3; white-space: nowrap; }
-            /* info QR of PAID / NO COD labels: 0.8 mm + 15 mm code + 0.5 mm + two 6 pt caption lines fit the 21.8 mm section */
-            .o_kh_qr_cell { width: 25mm; padding: 0.8mm 1.5mm 0 1.5mm !important; text-align: center; }
-            .o_kh_qr_cell .o_kh_qr { width: 15mm; height: 15mm; margin: 0 auto; }
-            .o_kh_qr_caption { font-size: 6pt; line-height: 1.25; white-space: nowrap; overflow: hidden; text-align: center; padding-top: 0.5mm; }
-            /* payment QR: the white cell is the quiet zone, also next to the black COD box. The 18 mm
-               code is centred without padding (wkhtmltopdf rounds paddings to whole CSS pixels):
-               ~2 mm left / right in the 22 mm cell, ~1.9 mm above / below in the 21.8 mm section */
-            .o_kh_payqr_cell { width: 22mm; padding: 0 !important; background: #fff !important; text-align: center; vertical-align: middle !important; }
-            .o_kh_payqr { width: 18mm; height: 18mm; margin: 0 auto; }
-            .o_kh_payqr_img { max-width: 18mm; max-height: 18mm; margin: 0 auto; }
+            .o_kh_secondary { font-size: 12pt; font-weight: bold; padding-left: 8px; }
+            .o_kh_small { font-size: 7pt; font-weight: bold; line-height: 11px; height: 14px; padding-top: 2px; white-space: nowrap; overflow: hidden; }
+            .o_kh_pay_caption { text-align: right; }
+            .o_kh_pay_cell { padding: 6px 8px !important; }
+            .o_kh_paid_box { border: 4px solid #000; }
+            .o_kh_paid_box table { height: 60px; }
+            .o_kh_paid_title { font-size: 15pt; font-weight: bold; line-height: 25px; height: 30px; padding-top: 3px; white-space: nowrap; }
+            .o_kh_paid_sub { font-size: 8.5pt; font-weight: bold; line-height: 14px; height: 18px; padding-top: 1px; white-space: nowrap; }
+            .o_kh_none_box { border: 2px solid #000; }
+            .o_kh_none_box table { height: 64px; }
+            .o_kh_none_title { font-size: 12pt; font-weight: bold; line-height: 20px; height: 23px; padding-top: 1px; white-space: nowrap; }
+            .o_kh_none_sub { font-size: 7pt; line-height: 12px; height: 16px; padding-top: 1px; white-space: nowrap; }
+            /* info QR of PAID / NO COD labels: 4 px quiet zone above, caption under the code */
+            .o_kh_qr_cell { padding: 4px 4px 0 4px !important; text-align: center; }
+            .o_kh_qr_cell .o_kh_qr_map { width: 58px; height: 58px; margin: 0 auto 6px auto; }
+            .o_kh_qr_cell .o_kh_qr_reference { width: 62px; height: 62px; margin: 0 auto 4px auto; }
+            .o_kh_qr_caption { font-size: 6pt; line-height: 10px; white-space: nowrap; overflow: hidden; text-align: center; }
+            .o_kh_qr_caption_kh { height: 12px; padding-top: 1px; }
+            /* payment QR: the white cell is the quiet zone, also next to the black COD box. The 68 px
+               (18 mm) code is centred: 6 px (1.6 mm) on every side in the 80 x 80 px cell */
+            .o_kh_payqr_cell { padding: 0 !important; background: #fff !important; text-align: center; vertical-align: middle !important; }
+            .o_kh_payqr { width: 68px; height: 68px; margin: 0 auto; }
+            .o_kh_payqr_other { font-size: 6pt; font-weight: bold; line-height: 11px; padding: 1px 4px 0 4px; white-space: normal; }
 
             /* 4. items and instructions */
-            /* the items summary and the note share 3 lines; Python decides how many each gets
-               (items_lines / note_lines) and fits the texts to them */
-            .o_kh_items_cell { padding: 0.3mm 1.6mm 0 1.6mm !important; }
-            .o_kh_items { font-size: 6.5pt; line-height: 1.25; overflow: hidden; }
-            .o_kh_items.o_kh_lines_1 { max-height: 2.9mm; white-space: nowrap; }
-            .o_kh_items.o_kh_lines_2 { max-height: 5.8mm; }
-            .o_kh_items.o_kh_lines_3 { max-height: 8.7mm; }
-            .o_kh_note { font-size: 7pt; line-height: 1.2; overflow: hidden; }
-            .o_kh_note.o_kh_lines_1 { max-height: 3mm; white-space: nowrap; }
-            .o_kh_note.o_kh_lines_2 { max-height: 6mm; }
-            .o_kh_note.o_kh_lines_3 { max-height: 9mm; }
-            .o_kh_chips_cell { width: 40mm; padding: 0.6mm 1.2mm 0 0 !important; }
-            .o_kh_chip { border: 0.3mm solid #000; font-size: 6pt; font-weight: bold; line-height: 1.3; height: 3.8mm; padding: 0.3mm 0.8mm 0 0.8mm; margin-bottom: 0.5mm; white-space: nowrap; overflow: hidden; }
+            /* the items summary and the note share the height; Python decides how many lines
+               each gets (items_lines / note_lines) and fits the texts to them */
+            .o_kh_items_cell { padding: 1px 6px 0 6px !important; }
+            .o_kh_items { overflow: hidden; }
+            .o_kh_note { overflow: hidden; }
+            .o_kh_chips_cell { width: 160px; padding: 1px 6px 0 0 !important; }
+            .o_kh_chip { border: 2px solid #000; font-size: 6pt; font-weight: bold; line-height: 10px; height: 16px; padding: 1px 3px 0 3px; margin-bottom: 1px; white-space: nowrap; overflow: hidden; }
             .o_kh_chip_inv { background: #000 !important; color: #fff !important; }
 
-            /* 5. footer */
-            .o_kh_barcode_cell { width: 52mm; padding: 0.5mm 2.8mm 0 2.8mm !important; }
-            .o_kh_barcode { width: 46mm; height: 4.6mm; }
-            .o_kh_barcode_text { font-size: 6pt; font-weight: bold; line-height: 1.2; letter-spacing: 0.25mm; text-align: center; white-space: nowrap; overflow: hidden; }
-            .o_kh_footer_text { font-size: 6pt; line-height: 1.3; max-height: 7.4mm; overflow: hidden; text-align: center; }
+            /* 5. footer: Code128 drawn with black HTML bars, 1 px per module, scaled by a transform
+               (vector, see BARCODE_SCALES); the left padding of the cell is the quiet zone */
+            .o_kh_barcode_cell { padding: 1px 0 0 12px !important; }
+            .o_kh_bars { height: 16px; overflow: visible; -webkit-transform-origin: 0 0; transform-origin: 0 0; }
+            .o_kh_bars i { display: block; float: left; height: 16px; background: #000 !important; }
+            .o_kh_barcode_img { width: 100%; height: 16px; }
+            .o_kh_barcode_text { font-size: 6pt; font-weight: bold; line-height: 9px; height: 9px; letter-spacing: 1px; text-align: center; white-space: nowrap; overflow: hidden; }
+            .o_kh_footer_cell { padding: 0 5px !important; }
+            .o_kh_footer_text { overflow: hidden; text-align: center; }
         </style>
     </template>
 
@@ -193,26 +204,26 @@
     <template id="report_cod_label_head">
         <div class="o_kh_sec o_kh_sec_head">
             <table class="o_kh_cols"><tr>
-                <td class="o_kh_pad o_kh_middle" style="width: 47mm;">
+                <td class="o_kh_head_cell o_kh_middle" style="width: 166px;">
                     <table><tr>
                         <td t-if="label['logo']" class="o_kh_logo_cell o_kh_middle">
                             <img class="o_kh_logo" t-att-src="label['logo']" alt="Logo"/>
                         </td>
                         <td class="o_kh_middle">
-                            <div class="o_kh_company" t-out="label['company_name']"/>
-                            <div t-if="label['tagline']" class="o_kh_tagline" t-out="label['tagline']"/>
-                            <div t-if="label['company_phone']" class="o_kh_cphone">&#9742; <t t-out="label['company_phone']"/></div>
+                            <div class="o_kh_company o_kh_line" t-att-style="label['company_style']" t-out="kh(label['company_name'], True)"/>
+                            <div t-if="label['tagline']" class="o_kh_tagline" t-att-style="label['tagline_style']" t-out="kh(label['tagline'])"/>
+                            <div t-if="label['company_phone']" class="o_kh_cphone o_kh_line" t-att-style="label['company_phone_style']">&#9742; <t t-out="label['company_phone']"/></div>
                         </td>
                     </tr></table>
                 </td>
-                <td class="o_kh_pad o_kh_sep o_kh_middle" style="width: 25mm;">
-                    <div class="o_kh_ref" t-out="label['reference']"/>
-                    <div t-if="label['order_ref']" class="o_kh_meta" t-out="label['order_ref']"/>
-                    <div t-if="label['date']" class="o_kh_meta" t-out="label['date']"/>
+                <td class="o_kh_head_cell o_kh_sep o_kh_middle" style="width: 104px;">
+                    <div class="o_kh_ref o_kh_line" t-att-style="label['reference_style']" t-out="label['reference_header']"/>
+                    <div t-if="label['order_ref']" class="o_kh_meta o_kh_line" t-att-style="label['meta_style']" t-out="label['order_ref']"/>
+                    <div t-if="label['date']" class="o_kh_meta o_kh_line" t-att-style="label['meta_style']" t-out="label['date']"/>
                 </td>
-                <td class="o_kh_pad o_kh_sep o_kh_middle o_kh_center">
-                    <div t-if="label['courier']" class="o_kh_courier" t-out="label['courier']"/>
-                    <div class="o_kh_parcel_label">កញ្ចប់ Parcel</div>
+                <td class="o_kh_head_cell o_kh_sep o_kh_middle o_kh_center">
+                    <div t-if="label['courier']" class="o_kh_courier o_kh_line" t-att-style="label['courier_style']" t-out="kh(label['courier'], True)"/>
+                    <div class="o_kh_parcel_label o_kh_line" t-att-style="label['parcel_label_style']"><span class="o_kh_kb">កញ្ចប់</span> Parcel</div>
                     <div class="o_kh_parcel_line">
                         <span class="o_kh_parcel" t-out="label['parcel_label']"/>
                         <span t-if="label['weight']" class="o_kh_weight"> · <t t-out="label['weight']"/></span>
@@ -224,12 +235,11 @@
 
     <!-- QR code with caption (info QR: map / reference) -->
     <template id="report_cod_label_info_qr">
-        <img class="o_kh_qr" t-att-src="label['info_qr']" alt="QR"/>
-        <div class="o_kh_qr_caption">
-            <t t-foreach="label['info_qr_caption_lines']" t-as="caption_line">
-                <t t-out="caption_line"/><br t-if="not caption_line_last"/>
-            </t>
-        </div>
+        <img t-attf-class="o_kh_qr o_kh_qr_#{label['info_qr_kind']}" t-att-src="label['info_qr']" alt="QR"/>
+        <t t-foreach="label['info_qr_caption_lines']" t-as="caption_line">
+            <div t-attf-class="o_kh_qr_caption #{'o_kh_qr_caption_kh' if label['info_qr_kind'] == 'map' else ''}"
+                 t-out="kh(caption_line, True)"/>
+        </t>
     </template>
 
     <!-- 2. Receiver: name, phone, address | province box | info QR (when the payment QR takes its place) -->
@@ -238,36 +248,36 @@
         <div t-attf-class="o_kh_sec o_kh_sec_recv #{'o_kh_with_info' if info_here else ''}">
             <table class="o_kh_cols"><tr>
                 <td class="o_kh_recv_cell">
-                    <div class="o_kh_tag">អ្នកទទួល · TO</div>
-                    <div class="o_kh_name" t-attf-style="font-size: #{label['name_size']}pt;" t-out="label['receiver_name']"/>
-                    <div class="o_kh_phone" t-attf-style="font-size: #{label['phone_size']}pt;">
+                    <div class="o_kh_tag o_kh_line"><span class="o_kh_kb">អ្នកទទួល</span> · TO</div>
+                    <div class="o_kh_name o_kh_line" t-att-style="label['name_style']" t-out="kh(label['receiver_name'], True)"/>
+                    <div class="o_kh_phone o_kh_line" t-att-style="label['phone_style']">
                         <span class="o_kh_phone_icon">&#9742;</span>
                         <t t-if="label['phones']">
                             <span t-out="label['phones'][0]"/>
                             <span t-if="len(label['phones']) &gt; 1 and not label['phone2_line']"
                                   t-attf-style="font-size: #{label['phone2_size']}pt;">/ <t t-out="label['phones'][1]"/></span>
                         </t>
-                        <span t-else="" class="o_kh_blank" style="width: 40mm;"/>
+                        <span t-else="" class="o_kh_blank" style="width: 150px;"/>
                     </div>
-                    <div t-if="label['phone2_line']" class="o_kh_phone2_line">&#9742; <t t-out="label['phones'][1]"/></div>
-                    <div t-if="label['address']" t-attf-class="o_kh_address #{'o_kh_address_2' if label['phone2_line'] else ''}"
-                         t-out="label['address']"/>
-                    <div t-elif="not label['phone2_line']" class="o_kh_address_blank">
-                        អាសយដ្ឋាន Address: <span class="o_kh_blank" style="width: 30mm;"/><br/>
-                        <span class="o_kh_blank" style="width: 48mm;"/>
+                    <div t-if="label['phone2_line']" class="o_kh_phone2_line o_kh_line" t-att-style="label['phone2_style']">&#9742; <t t-out="label['phones'][1]"/></div>
+                    <div t-if="label['address_rows']" class="o_kh_address o_kh_rows" t-att-style="label['address_style']"><t t-foreach="label['address_rows']" t-as="row"><t t-out="kh(row)"/><br t-if="not row_last"/></t></div>
+                    <div t-elif="label['address_blank_lines']" class="o_kh_address" t-att-style="label['address_blank_style']">
+                        <span class="o_kh_kh">អាសយដ្ឋាន</span> Address: <span class="o_kh_blank" style="width: 110px;"/>
+                        <t t-if="label['address_blank_lines'] &gt; 1"><br/><span class="o_kh_blank" style="width: 180px;"/></t>
                     </div>
                 </td>
-                <td t-if="label['province']" class="o_kh_province_cell">
+                <td t-if="label['province']" class="o_kh_province_cell"
+                    t-attf-style="width: #{92 if info_here else 104}px;">
                     <div class="o_kh_province_box">
                         <table><tr><td class="o_kh_middle o_kh_center">
-                            <div class="o_kh_province_label">ខេត្ត/ក្រុង PROVINCE</div>
-                            <div t-if="label['province_prefix']" class="o_kh_province_prefix" t-out="label['province_prefix']"/>
-                            <div class="o_kh_province_name" t-attf-style="font-size: #{label['province_size']}pt;"
-                                 t-out="label['province_main']"/>
+                            <div class="o_kh_province_label"><span class="o_kh_kb">រាជធានី</span>/<span class="o_kh_kb">ខេត្ត</span><t t-if="not info_here"> PROVINCE</t></div>
+                            <div t-if="label['province_prefix']" class="o_kh_province_prefix" t-out="kh(label['province_prefix'], True)"/>
+                            <div class="o_kh_province_name o_kh_rows" t-att-style="label['province_style']"><t t-foreach="label['province_rows']" t-as="row"><t t-out="kh(row, True)"/><br t-if="not row_last"/></t></div>
+                            <div t-if="label['province_city_rows']" class="o_kh_province_city o_kh_rows" t-att-style="label['province_city_style']"><t t-foreach="label['province_city_rows']" t-as="row"><t t-out="kh(row, True)"/><br t-if="not row_last"/></t></div>
                         </td></tr></table>
                     </div>
                 </td>
-                <td t-if="info_here" class="o_kh_info_cell">
+                <td t-if="info_here" class="o_kh_info_cell" style="width: 69px;">
                     <t t-call="delivery_label_cod_kh.report_cod_label_info_qr"/>
                 </td>
             </tr></table>
@@ -281,42 +291,46 @@
         <div t-attf-class="o_kh_sec o_kh_sec_pay o_kh_state_#{money['state']}">
             <table class="o_kh_cols"><tr>
                 <td t-if="money['state'] == 'cod'" class="o_kh_pay_cod">
-                    <div class="o_kh_pay_title">COD · ប្រាក់ត្រូវប្រមូល</div>
-                    <div class="o_kh_amount_line">
-                        <span class="o_kh_amount" t-attf-style="font-size: #{money['amount_size']}pt;" t-out="money['amount_str']"/>
-                        <span t-if="money['secondary_str']" class="o_kh_secondary" t-out="money['secondary_str']"/>
+                    <div class="o_kh_pay_title">COD · <span class="o_kh_kb">ប្រាក់ត្រូវប្រមូល</span></div>
+                    <div class="o_kh_amount_line" t-att-style="money['amount_style']">
+                        <span class="o_kh_amount" t-out="kh(money['amount_str'], True)"/>
+                        <span t-if="money['secondary_str']" class="o_kh_secondary" t-out="kh(money['secondary_str'], True)"/>
                     </div>
-                    <div t-if="money['goods_str']" class="o_kh_breakdown">
-                        ថ្លៃទំនិញ Goods <t t-out="money['goods_str']"/> + ថ្លៃដឹក Delivery <t t-out="money['fee_str']"/>
+                    <div t-if="'fee' in money['lines']" class="o_kh_small o_kh_breakdown">
+                        <span class="o_kh_kb">ថ្លៃទំនិញ</span> Goods <t t-out="kh(money['goods_str'], True)"/> + <span class="o_kh_kb">ថ្លៃដឹក</span> Delivery <t t-out="kh(money['fee_str'], True)"/>
                     </div>
-                    <div t-if="label['parcel_count'] &gt; 1" class="o_kh_breakdown o_kh_multi">
-                        សរុប <t t-out="label['parcel_count']"/> កញ្ចប់ ប្រមូលតែម្តង · Total for <t t-out="label['parcel_count']"/> parcels, collect once
+                    <div t-if="'nofee' in money['lines']" class="o_kh_small o_kh_nofee" t-out="kh(money['nofee_str'], True)"/>
+                    <div t-if="'parcels' in money['lines']" class="o_kh_small o_kh_multi">
+                        <span class="o_kh_kb">សរុប</span> <t t-out="label['parcel_count']"/> <span class="o_kh_kb">កញ្ចប់ ប្រមូលតែម្ដង</span> · Total for <t t-out="label['parcel_count']"/> parcels, collect once
                     </div>
-                    <div t-if="pay_qr" class="o_kh_pay_caption">
-                        <t t-out="pay_qr['caption']"/> &#9654;
+                    <div t-if="'pay' in money['lines'] and label['pay_qr_here']" class="o_kh_small o_kh_pay_caption">
+                        <t t-out="kh(pay_qr['caption'], True)"/> &#9654;
                     </div>
                 </td>
                 <td t-elif="money['state'] == 'paid'" class="o_kh_pay_cell">
                     <div class="o_kh_paid_box">
                         <table><tr><td class="o_kh_middle o_kh_center">
-                            <div class="o_kh_paid_title">PAID · បានទូទាត់រួច</div>
-                            <div class="o_kh_paid_sub">DO NOT COLLECT · មិនត្រូវប្រមូលប្រាក់</div>
+                            <div class="o_kh_paid_title">PAID · <span class="o_kh_kb">បានទូទាត់រួច</span></div>
+                            <div class="o_kh_paid_sub">DO NOT COLLECT · <span class="o_kh_kb">មិនត្រូវប្រមូលប្រាក់</span></div>
                         </td></tr></table>
                     </div>
                 </td>
                 <td t-else="" class="o_kh_pay_cell">
                     <div class="o_kh_none_box">
                         <table><tr><td class="o_kh_middle o_kh_center">
-                            <div class="o_kh_none_title">NO COD · មិនប្រមូលប្រាក់</div>
-                            <div class="o_kh_none_sub">Nothing to collect</div>
+                            <div class="o_kh_none_title">NO COD · <span class="o_kh_kb">មិនប្រមូលប្រាក់</span></div>
+                            <div class="o_kh_none_sub"><span class="o_kh_kh">មិនមានប្រាក់ត្រូវប្រមូល</span> · Nothing to collect</div>
                         </td></tr></table>
                     </div>
                 </td>
-                <td t-if="pay_qr" t-attf-class="o_kh_payqr_cell o_kh_payqr_#{pay_qr['mode']}">
-                    <img t-if="pay_qr['mode'] == 'khqr_image'" class="o_kh_payqr_img" t-att-src="pay_qr['image']" alt="KHQR"/>
-                    <img t-else="" class="o_kh_payqr" t-att-src="pay_qr['image']" alt="Pay QR"/>
+                <td t-if="pay_qr" t-attf-class="o_kh_payqr_cell o_kh_payqr_#{pay_qr['mode']}" style="width: 80px;">
+                    <img t-if="label['pay_qr_here']" class="o_kh_payqr" t-att-style="pay_qr['image_style']"
+                         t-att-src="pay_qr['image']" alt="Pay QR"/>
+                    <div t-else="" class="o_kh_payqr_other">
+                        <span class="o_kh_kb">ស្កេនបង់ប្រាក់</span><br/><span class="o_kh_kb">នៅកញ្ចប់</span> 1/<t t-out="label['parcel_count']"/><br/>Pay QR on<br/>parcel 1/<t t-out="label['parcel_count']"/>
+                    </div>
                 </td>
-                <td t-elif="label['info_qr'] and label['info_qr_place'] == 'payment'" class="o_kh_qr_cell">
+                <td t-elif="label['info_qr'] and label['info_qr_place'] == 'payment'" class="o_kh_qr_cell" style="width: 96px;">
                     <t t-call="delivery_label_cod_kh.report_cod_label_info_qr"/>
                 </td>
             </tr></table>
@@ -328,21 +342,20 @@
         <div class="o_kh_sec o_kh_sec_items">
             <table class="o_kh_cols"><tr>
                 <td class="o_kh_items_cell">
-                    <div t-if="label['items_lines'] and (label['items'] or label['items_more'])"
-                         t-attf-class="o_kh_items o_kh_lines_#{label['items_lines']}">
-                        <b>ទំនិញ Items (ចំនួន Qty <t t-out="label['total_qty']"/>):</b>
-                        <t t-if="label['items']">
-                            <t t-out="label['items']"/><b t-if="label['items_more']"> … +<t t-out="label['items_more']"/> more</b>
-                        </t>
-                        <t t-else=""><t t-out="label['items_more']"/> មុខ products</t>
+                    <div t-if="label['items_lines'] and (label['items_rows'] or label['items_more'])"
+                         t-attf-class="o_kh_items o_kh_rows o_kh_lines_#{len(label['items_rows']) or 1}" t-att-style="label['items_style']">
+                        <b><span class="o_kh_kb">ទំនិញ</span> Items (<span class="o_kh_kb">ចំនួន</span> Qty <t t-out="label['total_qty']"/>): </b>
+                        <t t-if="label['items_rows']"><t t-foreach="label['items_rows']" t-as="row"><t t-out="kh(row)"/><b t-if="row_last and label['items_more']"> … +<t t-out="label['items_more']"/> more</b><br t-if="not row_last"/></t></t>
+                        <t t-else=""><t t-out="label['items_more']"/> <span class="o_kh_kh">មុខ</span> <t t-if="label['items_more'] == 1">product</t><t t-else="">products</t></t>
                     </div>
-                    <div t-if="label['note']" t-attf-class="o_kh_note o_kh_lines_#{label['note_lines']}">
-                        <b>ចំណាំ Note:</b> <t t-out="label['note']"/>
+                    <div t-if="label['note_rows']" t-attf-class="o_kh_note o_kh_rows o_kh_lines_#{label['note_lines']}" t-att-style="label['note_style']">
+                        <b><span class="o_kh_kb">ចំណាំ</span> Note:</b> <t t-foreach="label['note_rows']" t-as="row"><t t-out="kh(row)"/><br t-if="not row_last"/></t>
                     </div>
                 </td>
-                <td t-if="label['fragile'] or label['allow_check']" class="o_kh_chips_cell">
-                    <div t-if="label['fragile']" class="o_kh_chip o_kh_chip_inv">&#9888; ប្រយ័ត្នបែក FRAGILE</div>
-                    <div t-if="label['allow_check']" class="o_kh_chip">&#10003; អនុញ្ញាតឱ្យពិនិត្យទំនិញ Allow check</div>
+                <td class="o_kh_chips_cell">
+                    <div t-if="label['fragile']" class="o_kh_chip o_kh_chip_inv">&#9888; <span class="o_kh_kb">ប្រយ័ត្នបែក</span> · FRAGILE</div>
+                    <div t-if="label['allow_check']" class="o_kh_chip o_kh_chip_check">&#10003; <span class="o_kh_kb">អនុញ្ញាតឱ្យពិនិត្យទំនិញ</span> · Allow check</div>
+                    <div t-else="" class="o_kh_chip o_kh_chip_nocheck">&#10007; <span class="o_kh_kb">មិនអនុញ្ញាតឱ្យពិនិត្យ</span> · No check</div>
                 </td>
             </tr></table>
         </div>
@@ -352,12 +365,13 @@
     <template id="report_cod_label_foot">
         <div class="o_kh_sec o_kh_sec_foot">
             <table class="o_kh_cols"><tr>
-                <td class="o_kh_barcode_cell">
-                    <img t-if="label['barcode']" class="o_kh_barcode" t-att-src="label['barcode']" alt="Barcode"/>
-                    <div class="o_kh_barcode_text" t-out="label['reference']"/>
+                <td class="o_kh_barcode_cell" t-att-style="label['barcode_cell_style']">
+                    <div t-if="label['barcode_bars']" class="o_kh_bars" t-att-style="label['barcode_style']"><t t-foreach="label['barcode_bars']" t-as="bar"><i t-attf-style="margin-left: #{bar[0]}px; width: #{bar[1]}px;"/></t></div>
+                    <img t-elif="label['barcode']" class="o_kh_barcode_img" t-att-src="label['barcode']" alt="Barcode"/>
+                    <div class="o_kh_barcode_text" t-att-style="label['barcode_text_style']" t-out="label['reference']"/>
                 </td>
-                <td class="o_kh_pad o_kh_middle">
-                    <div t-if="label['footer']" class="o_kh_footer_text" t-out="label['footer']"/>
+                <td class="o_kh_footer_cell o_kh_middle">
+                    <div t-if="label['footer_rows']" class="o_kh_footer_text o_kh_rows" t-att-style="label['footer_style']"><t t-foreach="label['footer_rows']" t-as="row"><t t-out="kh(row)"/><br t-if="not row_last"/></t></div>
                 </td>
             </tr></table>
         </div>

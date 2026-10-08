@@ -1,0 +1,936 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* delivery_label_cod_kh
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 18.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-08 11:16+0000\n"
+"PO-Revision-Date: 2026-10-08 11:16+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: km\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"%(picking)s does not carry the whole order %(order)s (missing: %(missing)s):"
+" the %(amount)s due on the order may include goods that are not in this "
+"parcel. Set the COD mode to Manual (amount for this parcel) or Paid before "
+"printing the COD label."
+msgstr ""
+"%(picking)s មិនដឹកទំនិញទាំងអស់នៃការបញ្ជាទិញ %(order)s ទេ (ខ្វះ៖ "
+"%(missing)s)៖ ប្រាក់ %(amount)s ដែលនៅជំពាក់លើការបញ្ជាទិញ "
+"អាចរាប់បញ្ចូលទំនិញដែលមិននៅក្នុងកញ្ចប់នេះ។ សូមកំណត់របៀប COD ជា "
+"«ចំនួនបញ្ចូលដោយដៃ» (ប្រាក់សម្រាប់កញ្ចប់នេះ) ឬ «បានបង់រួច» "
+"មុនពេលបោះពុម្ពស្លាក COD។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid "%s is cancelled: a cancelled transfer has no COD label."
+msgstr "%s ត្រូវបានលុបចោល៖ ការផ្ទេរដែលបានលុបចោលគ្មានស្លាក COD ទេ។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.actions.report,print_report_name:delivery_label_cod_kh.action_report_cod_label
+msgid "'COD Label - %s' % object.name"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"'Scan to pay' QR code printed next to the amount on COD labels only (never "
+"on PAID / NO COD labels)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_pay_qr
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_pay_qr
+msgid ""
+"'Scan to pay' QR code printed next to the amount on COD labels only:\n"
+"- Odoo payment link: opens the payment page of the sales order with the COD amount (pay with any published payment provider, e.g. ABA KHQR). Transfers without sales order use the static KHQR image instead, when one is set.\n"
+"- Static ABA KHQR image: the uploaded image; the customer types the amount.\n"
+"- Custom URL: the URL template below.\n"
+"- No payment QR."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "+ <span class=\"o_kh_kb\">ថ្លៃដឹក</span> Delivery"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "<b><span class=\"o_kh_kb\">ចំណាំ</span> Note:</b>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "<br/>Pay QR on<br/>parcel 1/"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "<i class=\"fa fa-exclamation-triangle me-1\" title=\"Warning\"/>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "<span class=\"o_kh_kb\">កញ្ចប់ ប្រមូលតែម្ដង</span> · Total for"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_head
+msgid "<span class=\"o_kh_kb\">កញ្ចប់</span> Parcel"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "<span class=\"o_kh_kb\">ថ្លៃទំនិញ</span> Goods"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid ""
+"<span class=\"o_kh_kb\">ទំនិញ</span> Items (<span "
+"class=\"o_kh_kb\">ចំនួន</span> Qty"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_receiver
+msgid "<span class=\"o_kh_kb\">រាជធានី</span>/<span class=\"o_kh_kb\">ខេត្ត</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "<span class=\"o_kh_kb\">សរុប</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid ""
+"<span class=\"o_kh_kb\">ស្កេនបង់ប្រាក់</span><br/><span "
+"class=\"o_kh_kb\">នៅកញ្ចប់</span> 1/"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_receiver
+msgid "<span class=\"o_kh_kb\">អ្នកទទួល</span> · TO"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid ""
+"<span class=\"o_kh_kh\">មិនមានប្រាក់ត្រូវប្រមូល</span> · Nothing to collect"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "<span class=\"o_kh_kh\">មុខ</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_receiver
+msgid ""
+"<span class=\"o_kh_kh\">អាសយដ្ឋាន</span> Address: <span class=\"o_kh_blank\""
+" style=\"width: 110px;\"/>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_receiver
+msgid "<span class=\"o_kh_phone_icon\">☎</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_khqr_image
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_khqr_image
+msgid "ABA KHQR Image"
+msgstr "រូបភាព ABA KHQR"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_allow_check_default
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_allow_check_default
+msgid "Allow Check by Default"
+msgstr "អនុញ្ញាតឱ្យពិនិត្យតាមលំនាំដើម"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_allow_check
+msgid "Allow to Check Goods"
+msgstr "អនុញ្ញាតឱ្យពិនិត្យទំនិញ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_cod_amount_auto
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "Amount Due on Order"
+msgstr "ប្រាក់នៅជំពាក់លើការបញ្ជាទិញ"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "Amount on Label"
+msgstr "ប្រាក់លើស្លាក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_cod_amount
+msgid "Amount printed on the COD label."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_cod_amount_manual
+msgid ""
+"Amount the courier must collect, used when the COD mode is 'Manual amount'. "
+"Use the mode 'Paid - do not collect' when nothing must be collected."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_payment_mode__auto
+msgid "Auto (from sales order)"
+msgstr "ស្វ័យប្រវត្តិ (ពីការបញ្ជាទិញ)"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_payment_mode
+msgid ""
+"Auto: amount still due on the sales order (total minus posted invoice payments and online payments).\n"
+"Manual: the amount entered below.\n"
+"Paid: the label says PAID - DO NOT COLLECT."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_foot
+msgid "Barcode"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.vpicktree_cod_label
+msgid "COD"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_cod_amount
+msgid "COD Amount"
+msgstr "ប្រាក់ត្រូវប្រមូល"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_cod_currency_id
+msgid "COD Currency"
+msgstr "រូបិយប័ណ្ណ COD"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "COD Delivery Label"
+msgstr "ស្លាកដឹកជញ្ជូន COD"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model,name:delivery_label_cod_kh.model_report_delivery_label_cod_kh_report_cod_label
+msgid "COD Delivery Label 100x80"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "COD Label"
+msgstr "ស្លាក COD"
+
+#. module: delivery_label_cod_kh
+#: model:ir.actions.report,name:delivery_label_cod_kh.action_report_cod_label
+msgid "COD Label 100x80"
+msgstr "ស្លាក COD 100x80"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_payment_mode
+msgid "COD Mode"
+msgstr "របៀប COD"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_cod_state
+msgid "COD Status"
+msgstr "ស្ថានភាព COD"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_cod_warning
+msgid "COD Warning"
+msgstr "ការព្រមាន COD"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "COD · <span class=\"o_kh_kb\">ប្រាក់ត្រូវប្រមូល</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_cod_state__cod
+msgid "Collect on delivery"
+msgstr "ប្រមូលប្រាក់ពេលដឹកដល់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model,name:delivery_label_cod_kh.model_res_company
+msgid "Companies"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model,name:delivery_label_cod_kh.model_res_config_settings
+msgid "Config Settings"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_pay_qr__custom_url
+msgid "Custom URL"
+msgstr "URL ផ្ទាល់ខ្លួន"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "DO NOT COLLECT · <span class=\"o_kh_kb\">មិនត្រូវប្រមូលប្រាក់</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Default handling flags of new delivery orders (editable on each transfer, "
+"tab 'COD Label')."
+msgstr ""
+"លំនាំដើមនៃសញ្ញាការប្រុងប្រយ័ត្នសម្រាប់ការដឹកជញ្ជូនថ្មី "
+"(អាចកែលើការផ្ទេរនីមួយៗ ផ្ទាំង «ស្លាក COD»)។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_allow_check_default
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_allow_check_default
+msgid ""
+"Default value of the 'Allow to check goods' flag of new delivery orders (the"
+" customer may open the parcel before paying)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_fragile_default
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_fragile_default
+msgid "Default value of the 'Fragile' flag of new delivery orders."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "Delivery"
+msgstr "ការដឹកជញ្ជូន"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Delivery Order Defaults"
+msgstr "លំនាំដើមនៃការដឹកជញ្ជូន"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_khr_rate
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rate
+msgid "Fixed KHR Rate"
+msgstr "អត្រារៀលថេរ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_khr_rate_source__fixed
+msgid "Fixed rate"
+msgstr "អត្រាថេរ"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Fixed rate (៛ per 1 USD)"
+msgstr "អត្រាថេរ (៛ ក្នុង 1 USD)"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_fragile
+msgid "Fragile"
+msgstr "ងាយបែក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_fragile_default
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_fragile_default
+msgid "Fragile by Default"
+msgstr "ងាយបែកតាមលំនាំដើម"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_no_fee_note__free
+msgid "Free delivery (paid by the shop)"
+msgstr "ដឹកជញ្ជូនឥតគិតថ្លៃ (ហាងចេញថ្លៃដឹក)"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model,name:delivery_label_cod_kh.model_payment_link_wizard
+msgid "Generate Sales Payment Link"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Google Maps location of the receiver (transfer reference when the contact "
+"has no geolocation), the transfer reference, or nothing. On COD labels with "
+"a payment QR code it moves to the receiver section."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_khr_rate_source
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rate_source
+msgid ""
+"How amounts are converted between the order currency and Cambodian riel on "
+"the COD label. 'Odoo currency rate' uses the rate of the KHR currency "
+"(Accounting > Configuration > Currencies) and falls back to the fixed rate "
+"when KHR is inactive or has no rate."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"How the amount to collect is converted between the order currency and "
+"Cambodian riel (KHR) on the 100 x 80 mm COD label."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"Invoice %(invoices)s of order %(order)s also invoices %(others)s and is "
+"partly paid: its payment cannot be split between the orders. Set the COD "
+"mode to Manual or Paid before printing the COD label."
+msgstr ""
+"វិក្កយបត្រ %(invoices)s នៃការបញ្ជាទិញ %(order)s ក៏ជាវិក្កយបត្ររបស់ "
+"%(others)s ដែរ ហើយត្រូវបានបង់ប្រាក់មួយផ្នែក៖ "
+"មិនអាចបែងចែកការបង់ប្រាក់នេះរវាងការបញ្ជាទិញបានទេ។ សូមកំណត់របៀប COD ជា "
+"«ចំនួនបញ្ចូលដោយដៃ» ឬ «បានបង់រួច» មុនពេលបោះពុម្ពស្លាក COD។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_khr_rate_source
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rate_source
+msgid "KHR Rate Source"
+msgstr "ប្រភពអត្រារៀល"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_footer
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_footer
+msgid "Label Footer"
+msgstr "អត្ថបទខាងក្រោមស្លាក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_qr_content
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_qr_content
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Label Info QR Code"
+msgstr "QR ព័ត៌មានលើស្លាក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_label_note
+msgid "Label Note"
+msgstr "ចំណាំលើស្លាក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_tagline
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_tagline
+msgid "Label Tagline"
+msgstr "ឃ្លាលើស្លាក"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Label Texts"
+msgstr "អត្ថបទលើស្លាក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_no_fee_note
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_no_fee_note
+msgid ""
+"Line printed in the COD box when the sales order has no delivery fee (no delivery line, or a free one), so a courier knows whether to add its own fee:\n"
+"- Free delivery: 'ដឹកជញ្ជូនឥតគិតថ្លៃ · Free delivery: collect this amount only'.\n"
+"- The receiver pays the courier: 'ថ្លៃដឹកមិនរួមបញ្ចូល · Delivery fee not included'.\n"
+"Orders with a delivery fee print 'Goods $15.00 + Delivery $2.00' instead."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Line printed under the amount to collect when the sales order has no "
+"delivery fee, so a courier knows whether to add its own fee. Orders with a "
+"delivery fee print 'Goods $15.00 + Delivery $2.00'."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_payment_link
+msgid ""
+"Link encoded in the 'scan to pay' QR code of the COD label (Inventory > "
+"Settings > COD Delivery Label > Payment QR Code): the payment page of the "
+"sales order for the amount to collect, or the custom payment URL. Copy it to"
+" send it by Telegram or SMS."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "List the products on the label (disable it for discreet parcels)."
+msgstr "បង្ហាញបញ្ជីទំនិញលើស្លាក (បិទសម្រាប់កញ្ចប់ដែលត្រូវការភាពឯកជន)។"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_head
+msgid "Logo"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_cod_amount_manual
+msgid "Manual COD Amount"
+msgstr "ប្រាក់ត្រូវប្រមូល (បញ្ចូលដោយដៃ)"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_payment_mode__manual
+msgid "Manual amount"
+msgstr "ចំនួនបញ្ចូលដោយដៃ"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "NO COD · <span class=\"o_kh_kb\">មិនប្រមូលប្រាក់</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_cod_state__none
+msgid "No COD"
+msgstr "មិនប្រមូលប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_pay_qr__none
+msgid "No payment QR"
+msgstr "គ្មាន QR បង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_qr_content__none
+msgid "Nothing"
+msgstr "គ្មាន"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_parcel_count
+msgid "Number of parcels: one label is printed per parcel (1/N ... N/N)."
+msgstr "ចំនួនកញ្ចប់៖ ស្លាកមួយត្រូវបោះពុម្ពសម្រាប់កញ្ចប់នីមួយៗ (1/N ... N/N)។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_max_item_lines
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_max_item_lines
+msgid "Number of products listed on the label before '+N more'."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_khr_rate_source__odoo
+msgid "Odoo currency rate"
+msgstr "អត្រារូបិយប័ណ្ណរបស់ Odoo"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_pay_qr__odoo_link
+msgid "Odoo payment link of the sales order"
+msgstr "តំណបង់ប្រាក់ Odoo នៃការបញ្ជាទិញ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_tagline
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_tagline
+msgid ""
+"Optional short line printed under the company name. Translatable: each "
+"language has its own text and the label prints the text of the language of "
+"the user who prints it."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Optional tagline under the company name and the thank-you line printed at "
+"the bottom of the label. Each language has its own text: the label prints "
+"the one of the language of the user who prints it."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"Order %(order)s has %(amount)s due over %(count)s deliveries (%(refs)s): set"
+" the COD mode to Manual (the amount to collect with each delivery) or Paid "
+"on these deliveries before printing the COD label, so the amount is not "
+"collected twice."
+msgstr ""
+"ការបញ្ជាទិញ %(order)s នៅជំពាក់ %(amount)s សម្រាប់ការដឹកជញ្ជូន %(count)s ដង "
+"(%(refs)s)៖ សូមកំណត់របៀប COD ជា «ចំនួនបញ្ចូលដោយដៃ» "
+"(ប្រាក់ត្រូវប្រមូលជាមួយការដឹកនីមួយៗ) ឬ «បានបង់រួច» លើការដឹកជញ្ជូនទាំងនេះ "
+"មុនពេលបោះពុម្ពស្លាក COD ដើម្បីកុំឱ្យប្រមូលប្រាក់ពីរដង។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"Order %(order)s has credit notes (%(refs)s): the amount still due cannot be "
+"computed safely (%(amount)s from the invoices and payments). Check it, then "
+"set the COD mode to Manual or Paid before printing the COD label."
+msgstr ""
+"ការបញ្ជាទិញ %(order)s មានឯកសារឥណទាន (%(refs)s)៖ "
+"មិនអាចគណនាប្រាក់ដែលនៅជំពាក់ឱ្យប្រាកដបានទេ (%(amount)s តាមវិក្កយបត្រ "
+"និងការបង់ប្រាក់)។ សូមពិនិត្យ រួចកំណត់របៀប COD ជា «ចំនួនបញ្ចូលដោយដៃ» ឬ "
+"«បានបង់រួច» មុនពេលបោះពុម្ពស្លាក COD។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_no_fee_note
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_no_fee_note
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Orders Without Delivery Fee"
+msgstr "ការបញ្ជាទិញគ្មានថ្លៃដឹក"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "PAID · <span class=\"o_kh_kb\">បានទូទាត់រួច</span>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_receiver
+msgid "PROVINCE"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_cod_state__paid
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_payment_mode__paid
+msgid "Paid - do not collect"
+msgstr "បានបង់រួច - កុំប្រមូលប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_parcel_count
+msgid "Parcels"
+msgstr "ចំនួនកញ្ចប់"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "Pay QR"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "Payment"
+msgstr "ការបង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_payment_link
+msgid "Payment Link"
+msgstr "តំណបង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Payment Providers"
+msgstr "អ្នកផ្តល់សេវាបង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_pay_qr
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_pay_qr
+msgid "Payment QR Code"
+msgstr "QR បង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Payment QR Code (COD)"
+msgstr "QR បង់ប្រាក់ (COD)"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_pay_url_template
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_pay_url_template
+msgid "Payment URL Template"
+msgstr "គំរូ URL បង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_receiver_phone
+msgid ""
+"Phone number(s) printed on the label, taken from the contact's phone, mobile"
+" or from a number typed in the contact name. Editable; recomputed when the "
+"contact changes."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Placeholders (URL-encoded): {order}, {picking}, {amount}, {currency}, "
+"{partner}."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Print '≈ 69,000៛' next to the amount to collect (or the dollar equivalent "
+"for orders in riel)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_show_items
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_show_items
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Print Item Summary"
+msgstr "បោះពុម្ពបញ្ជីទំនិញ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_show_khr
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_show_khr
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Print Riel Equivalent"
+msgstr "បោះពុម្ពចំនួនសមមូលជារៀល"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_no_fee_note__none
+msgid "Print nothing"
+msgstr "មិនបោះពុម្ពអ្វីទេ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_fragile
+msgid ""
+"Print the FRAGILE chip on the label. New delivery orders take the default of"
+" their company (Inventory > Settings > COD Delivery Label)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_show_items
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_show_items
+msgid ""
+"Print the list of products on the label. Disable it for discreet parcels."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_show_khr
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_show_khr
+msgid ""
+"Print the riel equivalent of the amount to collect (or the USD equivalent "
+"for orders in riel)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_max_item_lines
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_max_item_lines
+msgid "Products Listed"
+msgstr "ចំនួនមុខទំនិញដែលបង្ហាញ"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_info_qr
+msgid "QR"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_receiver_phone
+msgid "Receiver Phone"
+msgstr "ទូរស័ព្ទអ្នកទទួល"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_qr_content__map
+msgid "Receiver location (Google Maps)"
+msgstr "ទីតាំងអ្នកទទួល (Google Maps)"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Riel Conversion"
+msgstr "ការប្តូរទៅជារៀល"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_khr_rate
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rate
+msgid ""
+"Riel per 1 USD. Used when the rate source is 'Fixed rate', and as a fallback"
+" when the KHR currency is missing, inactive or has no rate."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_khr_rounding
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rounding
+msgid "Round Riel To"
+msgstr "បង្គត់រៀលទៅ"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "Round riel to"
+msgstr "បង្គត់រៀលទៅ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_label_note
+msgid "Short instruction printed on the label, e.g. 'call before 5pm'."
+msgstr "ការណែនាំខ្លីដែលបោះពុម្ពលើស្លាក ឧ. «តេមុនម៉ោង៥ល្ងាច»។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_pay_qr__khqr_image
+msgid "Static ABA KHQR image"
+msgstr "រូបភាព ABA KHQR ថេរ"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_khqr_image
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_khqr_image
+msgid ""
+"Static ABA KHQR payment QR code of the shop. Printed as the payment QR of "
+"COD labels in 'Static ABA KHQR image' mode, and as fallback of the Odoo "
+"payment link for transfers without sales order."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_footer
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_footer
+msgid ""
+"Text printed at the bottom of the label. Translatable: each language has its"
+" own text and the label prints the text of the language of the user who "
+"prints it."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_allow_check
+msgid ""
+"The customer may open and check the goods before paying. The label says it "
+"either way ('allowed' / 'not allowed'). New delivery orders take the default"
+" of their company."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"The customer opens the payment page of the sales order with the amount to collect\n"
+"                                and pays with a published payment provider (e.g. ABA KHQR). The link uses the\n"
+"                                base URL of the database (System Parameter <code>web.base.url</code>): it must be\n"
+"                                the public address of your Odoo. Transfers without sales order print the static\n"
+"                                KHQR image below when it is set."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"The fixed rate is also used when the KHR currency is inactive or has no "
+"rate."
+msgstr "អត្រាថេរក៏ត្រូវប្រើដែរ នៅពេលរូបិយប័ណ្ណ KHR មិនសកម្ម ឬគ្មានអត្រា។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"The manual COD amount of %(picking)s (%(manual)s) is more than the amount "
+"due on order %(order)s (%(due)s)."
+msgstr ""
+"ប្រាក់ COD បញ្ចូលដោយដៃនៃ %(picking)s (%(manual)s) "
+"លើសពីប្រាក់ដែលនៅជំពាក់លើការបញ្ជាទិញ %(order)s (%(due)s)។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"The manual COD amount of %(picking)s is 0: type the amount to collect, or "
+"set the COD mode to 'Paid - do not collect' if nothing must be collected."
+msgstr ""
+"ប្រាក់ COD បញ្ចូលដោយដៃនៃ %(picking)s គឺ 0៖ សូមវាយចំនួនប្រាក់ត្រូវប្រមូល "
+"ឬកំណត់របៀប COD ជា «បានបង់រួច - កុំប្រមូលប្រាក់» "
+"ប្រសិនបើគ្មានប្រាក់ត្រូវប្រមូលទេ។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid "The manual COD amount of %s cannot be negative."
+msgstr "ប្រាក់ COD បញ្ចូលដោយដៃនៃ %s មិនអាចតិចជាងសូន្យបានទេ។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid "The number of parcels of %(picking)s must be between 1 and %(max)s."
+msgstr "ចំនួនកញ្ចប់នៃ %(picking)s ត្រូវនៅចន្លោះ 1 និង %(max)s។"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_no_fee_note__receiver
+msgid "The receiver pays the courier separately"
+msgstr "អ្នកទទួលបង់ថ្លៃដឹកឱ្យអ្នកដឹកដាច់ដោយឡែក"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_khr_rounding
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rounding
+msgid ""
+"The riel amount printed on the label is rounded (half-up) to this step, e.g."
+" 100 prints 69,042 as 69,000. Zero or a negative value means no rounding (1 "
+"riel)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model,name:delivery_label_cod_kh.model_stock_picking
+msgid "Transfer"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_qr_content__reference
+msgid "Transfer reference"
+msgstr "លេខយោងការផ្ទេរ"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "URL"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_pay_url_template
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_pay_url_template
+msgid ""
+"URL encoded in the payment QR in 'Custom URL' mode. Placeholders (URL-"
+"encoded): {order} sales order reference, {picking} transfer reference, "
+"{amount} amount to collect, {currency} currency code (USD, KHR), {partner} "
+"receiver name. Example: "
+"https://pay.example.com/?ref={order}&amount={amount}&ccy={currency}"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid ""
+"Upload the QR code of the shop (ideally the square code itself, cropped from the ABA\n"
+"                                    card): it is cropped to its ink and printed 18 mm wide, and the customer types the\n"
+"                                    amount shown next to it."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_cod_amount_auto
+msgid ""
+"What the 'Auto' mode prints: sales order total minus the paid part of its "
+"posted invoices (credit notes deducted) and its online payments not "
+"reconciled with them."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_company__kh_label_qr_content
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_qr_content
+msgid ""
+"What the information QR code of the label contains:\n"
+"- Receiver location: Google Maps link built from the contact's geolocation (falls back to the transfer reference when the contact has no coordinates).\n"
+"- Transfer reference: the reference of the transfer.\n"
+"- Nothing: no information QR code."
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "e.g. 012 345 678"
+msgstr "ឧ. 012 345 678"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "e.g. Call before 5pm"
+msgstr "ឧ. តេមុនម៉ោង៥ល្ងាច"
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
+msgid "https://pay.example.com/?ref={order}&amount={amount}&ccy={currency}"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "more"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_payment
+msgid "parcels, collect once"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "product"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "products"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "⚠ <span class=\"o_kh_kb\">ប្រយ័ត្នបែក</span> · FRAGILE"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "✓ <span class=\"o_kh_kb\">អនុញ្ញាតឱ្យពិនិត្យទំនិញ</span> · Allow check"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
+msgid "✗ <span class=\"o_kh_kb\">មិនអនុញ្ញាតឱ្យពិនិត្យ</span> · No check"
+msgstr ""

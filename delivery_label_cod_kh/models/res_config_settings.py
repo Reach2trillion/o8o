@@ -19,6 +19,7 @@ class ResConfigSettings(models.TransientModel):
     kh_label_khqr_image = fields.Image(related='company_id.kh_label_khqr_image', readonly=False)
     kh_label_pay_qr = fields.Selection(related='company_id.kh_label_pay_qr', readonly=False)
     kh_label_pay_url_template = fields.Char(related='company_id.kh_label_pay_url_template', readonly=False)
+    kh_label_no_fee_note = fields.Selection(related='company_id.kh_label_no_fee_note', readonly=False)
     kh_label_show_items = fields.Boolean(related='company_id.kh_label_show_items', readonly=False)
     kh_label_max_item_lines = fields.Integer(related='company_id.kh_label_max_item_lines', readonly=False)
     kh_label_tagline = fields.Char(related='company_id.kh_label_tagline', readonly=False)

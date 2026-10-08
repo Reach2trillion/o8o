@@ -23,9 +23,10 @@
                     <group>
                         <group string="Payment" name="kh_cod_payment">
                             <field name="kh_cod_currency_id" invisible="1"/>
+                            <field name="sale_id" invisible="1"/>
                             <field name="kh_payment_mode" widget="radio" readonly="state == 'cancel'"/>
-                            <field name="kh_cod_amount_auto" string="Auto Amount (from order)" readonly="1"
-                                   invisible="kh_payment_mode != 'auto'"/>
+                            <field name="kh_cod_amount_auto" string="Amount Due on Order" readonly="1"
+                                   invisible="kh_payment_mode == 'paid' or not sale_id"/>
                             <field name="kh_cod_amount_manual" invisible="kh_payment_mode != 'manual'"
                                    readonly="state == 'cancel'"/>
                             <field name="kh_cod_state" readonly="1"/>

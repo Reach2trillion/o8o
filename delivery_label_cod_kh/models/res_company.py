@@ -20,6 +20,12 @@ PAY_QR_MODES = [
     ('none', 'No payment QR'),
 ]
 
+NO_FEE_NOTES = [
+    ('none', 'Print nothing'),
+    ('free', 'Free delivery (paid by the shop)'),
+    ('receiver', 'The receiver pays the courier separately'),
+]
+
 DEFAULT_KHR_RATE = 4100.0
 DEFAULT_FOOTER = 'អរគុណសម្រាប់ការគាំទ្រ! Thank you for your support!'
 
@@ -70,6 +76,13 @@ class ResCompany(models.Model):
              "{order} sales order reference, {picking} transfer reference, {amount} amount to collect, "
              "{currency} currency code (USD, KHR), {partner} receiver name. "
              "Example: https://pay.example.com/?ref={order}&amount={amount}&ccy={currency}")
+    kh_label_no_fee_note = fields.Selection(
+        NO_FEE_NOTES, string='Orders Without Delivery Fee', default='none', required=True,
+        help="Line printed in the COD box when the sales order has no delivery fee (no delivery line, "
+             "or a free one), so a courier knows whether to add its own fee:\n"
+             "- Free delivery: 'ដឹកជញ្ជូនឥតគិតថ្លៃ · Free delivery: collect this amount only'.\n"
+             "- The receiver pays the courier: 'ថ្លៃដឹកមិនរួមបញ្ចូល · Delivery fee not included'.\n"
+             "Orders with a delivery fee print 'Goods $15.00 + Delivery $2.00' instead.")
     kh_label_show_items = fields.Boolean(
         string='Print Item Summary', default=True,
         help="Print the list of products on the label. Disable it for discreet parcels.")
@@ -78,10 +91,12 @@ class ResCompany(models.Model):
         help="Number of products listed on the label before '+N more'.")
     kh_label_tagline = fields.Char(
         string='Label Tagline', translate=True,
-        help="Optional short line printed under the company name.")
+        help="Optional short line printed under the company name. Translatable: each language has its "
+             "own text and the label prints the text of the language of the user who prints it.")
     kh_label_footer = fields.Char(
         string='Label Footer', translate=True, default=DEFAULT_FOOTER,
-        help="Text printed at the bottom of the label.")
+        help="Text printed at the bottom of the label. Translatable: each language has its own text and "
+             "the label prints the text of the language of the user who prints it.")
     kh_label_fragile_default = fields.Boolean(
         string='Fragile by Default',
         help="Default value of the 'Fragile' flag of new delivery orders.")

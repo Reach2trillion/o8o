@@ -188,7 +188,8 @@ class TestPaymentQr(PaymentQrCommon):
         picking = self._deliveries(self._create_order())
         self.company.kh_label_pay_qr = 'custom_url'
         for template, expected in (
-            ('https://x.test/{amount:.2f}/{currency}', 'https://x.test/{amount:.2f}/USD'),
+            ('https://x.test/{amount:.2f}/{currency}', 'https://x.test/17.00/USD'),  # format spec ignored
+            ('https://x.test/{amount!r}/{partner:>100000000}', 'https://x.test/17.00/Sok%20Dara'),
             ('https://x.test/{0}/{}/{amount}', 'https://x.test/{0}/{}/17.00'),
             ('https://x.test/{order.name}?a={amount}', 'https://x.test/{order.name}?a=17.00'),
             ('https://x.test/{?a={amount}', 'https://x.test/{?a=17.00'),
@@ -210,7 +211,7 @@ class TestPaymentQr(PaymentQrCommon):
         self.assertTrue(label['pay_qr'])
         self.assertFalse(label['info_qr'])
         self.assertFalse(label['info_qr_place'])
-        self.assertTrue(label['barcode'])
+        self.assertTrue(label['barcode_bars'])
         # without payment QR (PAID label) the reference QR prints in the payment section as before
         picking.kh_payment_mode = 'paid'
         label = self._labels(picking)[0]
@@ -225,12 +226,18 @@ class TestPaymentQr(PaymentQrCommon):
         self.assertTrue(self._labels(cod)[0]['pay_qr'])
 
     def test_amount_fits_with_caption_and_parcels(self):
+        picking = self._deliveries(self._create_order(carrier=False))
+        money = self._labels(picking)[0]['money']
+        self.assertEqual((money['lines'], money['amount_size']), (['pay'], 25))
         picking = self._deliveries(self._create_order())
-        self.assertEqual(self._labels(picking)[0]['money']['amount_size'], 25)
+        money = self._labels(picking)[0]['money']
+        self.assertEqual(money['lines'], ['pay', 'fee'])
+        self.assertLess(money['amount_size'], 25, "fee breakdown + scan-to-pay lines: smaller amount")
         picking.kh_parcel_count = 2
-        sizes = {label['money']['amount_size'] for label in self._labels(picking)}
-        self.assertEqual(len(sizes), 1)
-        self.assertLessEqual(sizes.pop(), 19, "fee breakdown + parcels + scan-to-pay lines: smaller amount")
+        labels = self._labels(picking)
+        self.assertEqual({label['money']['amount_size'] for label in labels}, {money['amount_size']})
+        self.assertEqual(labels[0]['money']['lines'], ['parcels', 'pay'],
+                         "at most two small lines: the fee breakdown gives way")
 
     def test_html(self):
         cod = self._deliveries(self._create_order())

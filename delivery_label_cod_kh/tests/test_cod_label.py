@@ -6,7 +6,7 @@ from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import HttpCase, tagged
 from odoo.tools.pdf import PdfFileReader
 
-from odoo.addons.delivery_label_cod_kh.models.kh_label_text import fit_width, text_width_mm, truncate
+from odoo.addons.delivery_label_cod_kh.models.kh_label_text import count_units, fit_width, text_width_mm, truncate
 from .common import CodLabelCommon, FIXED_KHR_RATE
 
 REPORT = 'delivery_label_cod_kh.action_report_cod_label'
@@ -58,7 +58,8 @@ class TestCodAmount(CodLabelCommon):
         self.assertAlmostEqual(picking.kh_cod_amount, 7.0)
 
     def test_auto_credit_note_deducted(self):
-        """A paid invoice and a refunded part reconciled with it: the net paid amount counts."""
+        """A paid invoice and a refunded part: the net paid amount is computed (spec formula), but a
+        credit note can be a discount or an invoice to redo, so the automatic amount is not printed."""
         order = self._create_order()
         invoice = self._create_invoice(order)
         self._register_payment(invoice)
@@ -66,7 +67,11 @@ class TestCodAmount(CodLabelCommon):
         refund.invoice_line_ids.filtered(lambda line: line.price_unit != 2.0).unlink()  # refund the fee only
         refund.action_post()
         self._register_payment(refund)
-        self.assertAlmostEqual(self._deliveries(order).kh_cod_amount, 2.0)
+        picking = self._deliveries(order)
+        self.assertAlmostEqual(picking.kh_cod_amount_auto, 2.0)
+        self.assertIn(refund.name, picking.kh_cod_warning)
+        with self.assertRaises(UserError):
+            picking.action_print_cod_label()
 
     def test_auto_down_payment(self):
         order = self._create_order()
@@ -263,10 +268,22 @@ class TestCodAmbiguity(CodLabelCommon):
         backorder.action_print_cod_label()
 
     def test_cancelled_delivery_does_not_count(self):
-        _order, first, backorder = self._order_with_backorder()
-        backorder.action_cancel()
+        order = self._create_order()
+        first = self._deliveries(order)
+        second = first.copy()
+        self.assertEqual(second.sale_id, order)
+        self.assertIn(second.name, first.kh_cod_warning)
+        second.action_cancel()
         self.assertFalse(first.kh_cod_warning)
         first.action_print_cod_label()
+
+    def test_cancelled_backorder_leaves_goods_behind(self):
+        """Partial delivery whose backorder is cancelled: the goods left behind must not be collected."""
+        order, first, backorder = self._order_with_backorder()
+        backorder.action_cancel()
+        self.assertIn('missing: 1 × Serum 30ml', first.kh_cod_warning)
+        with self.assertRaises(UserError):
+            first.action_print_cod_label()
 
 
 @tagged('post_install', '-at_install')
@@ -336,7 +353,9 @@ class TestLabelValues(CodLabelCommon):
         self.assertEqual(label['phones'], ['012 345 678'])
         self.assertEqual(label['province'], 'ខេត្តកណ្តាល')
         self.assertEqual((label['province_prefix'], label['province_main']), ('ខេត្ត', 'កណ្តាល'))
-        self.assertIn('ក្រុងតាខ្មៅ', label['address'], "city printed when the province comes from the state")
+        self.assertEqual(label['province_city'], 'ក្រុងតាខ្មៅ', "the city / district prints in the province box")
+        self.assertNotIn('ក្រុងតាខ្មៅ', label['address'])
+        self.assertIn('ផ្ទះលេខ ១២៣', label['address'])
         self.assertNotIn('Cambodia', label['address'], "country of the company is not printed")
         self.assertNotIn('ខេត្តកណ្តាល', label['address'])
         self.assertEqual(label['company_phone'], '031 266 3333')
@@ -365,8 +384,9 @@ class TestLabelValues(CodLabelCommon):
         picking.kh_label_note = 'Call 30 min before arrival, deliver after 5pm only, leave at the pharmacy next door'
         label = self._labels(picking)[0]
         self.assertTrue(label['receiver_name'].endswith('…'))
-        self.assertLessEqual(len(label['receiver_name']), 40)
-        self.assertLessEqual(len(label['address']), 110)
+        self.assertLessEqual(count_units(label['receiver_name']), 40)
+        self.assertLessEqual(count_units(label['address']), 110)
+        self.assertLessEqual(len(label['address_rows']), 3)
         self.assertLessEqual(len(label['note']), 60)
         # a cut never leaves a dangling Khmer sign or COENG before the ellipsis
         for text in (label['receiver_name'], label['address']):
@@ -403,7 +423,11 @@ class TestLabelValues(CodLabelCommon):
         self.assertFalse(label['items'])
         self.assertEqual(label['items_lines'], 0)
         picking.kh_label_note = 'Call before 5pm'
-        self.assertEqual(self._labels(picking)[0]['note_lines'], 3, "the note gets the whole items area")
+        self.assertEqual(self._labels(picking)[0]['note_rows'], ['Call before 5pm'])
+        picking.kh_label_note = 'Call 30 min before arrival, deliver after 5pm only, leave at the pharmacy next door'
+        label = self._labels(picking)[0]
+        self.assertGreaterEqual(label['note_lines'], 2, "the note gets the whole items area")
+        self.assertEqual(label['items_lines'], 0)
 
     def test_items_line_kept_next_to_long_note(self):
         """A 2-line note leaves one line to the items: the quantity and number of products stay."""
@@ -422,23 +446,23 @@ class TestLabelValues(CodLabelCommon):
         self.assertEqual(label['total_qty'], '12')
         self.assertEqual(label['items_more'] + len(label['items'].split('× ')) - 1, 6)
         html = self.env['ir.actions.report']._render_qweb_html(REPORT, picking.ids)[0].decode()
-        self.assertIn('ចំនួន Qty 12', html)
-        self.assertIn('o_kh_items o_kh_lines_1', html)
-        self.assertIn('o_kh_note o_kh_lines_2', html)
+        self.assertIn('Qty 12', html)
+        self.assertIn('o_kh_items o_kh_rows o_kh_lines_1', html)
+        self.assertIn('o_kh_note o_kh_rows o_kh_lines_2', html)
         if not label['items']:
-            self.assertIn('6 មុខ products', html)
+            self.assertIn('6 <span class="o_kh_kh">មុខ</span> products', html)
 
     def test_qr(self):
         picking = self._deliveries(self._create_order())
         label = self._labels(picking)[0]
         self.assertTrue(label['info_qr'].startswith('data:image/png;base64,'), "map QR from the geolocation")
         self.assertEqual(label['info_qr_kind'], 'map')
-        self.assertTrue(label['barcode'].startswith('data:image/png;base64,'))
+        self.assertTrue(label['barcode_bars'], "Code128 drawn as HTML bars")
         # PAID label: the map QR stays in the payment section with its long caption
         picking.kh_payment_mode = 'paid'
         label = self._labels(picking)[0]
         self.assertEqual(label['info_qr_place'], 'payment')
-        self.assertEqual(label['info_qr_caption_lines'], ('ស្កេនមើលទីតាំង', 'Scan for map'))
+        self.assertEqual(label['info_qr_caption_lines'], ('ស្កេនមើលទីតាំង · MAP',))
         self.company.kh_label_qr_content = 'none'
         label = self._labels(picking)[0]
         self.assertFalse(label['info_qr'])
@@ -463,15 +487,19 @@ class TestLabelValues(CodLabelCommon):
 class TestLabelText(CodLabelCommon):
 
     def test_truncate_keeps_khmer_clusters(self):
+        """Limits count visible characters: a Khmer syllable is one character per base consonant."""
         text = 'ខេត្តបន្ទាយមានជ័យ'
-        for limit in range(2, len(text)):
+        self.assertEqual(count_units(text), 9)
+        for limit in range(1, count_units(text)):
             cut = truncate(text, limit)
             self.assertTrue(cut.endswith('…'))
-            self.assertLessEqual(len(cut), limit)
+            self.assertLessEqual(count_units(cut), limit)
             if len(cut) > 1:  # a bare ellipsis when not even one syllable fits
                 self.assertNotEqual(cut[-2], '្', cut)
-        self.assertEqual(truncate(text, 2), '…')
-        self.assertEqual(truncate(text, 3), 'ខេ…', "a consonant keeps its vowel sign")
+        self.assertEqual(truncate(text, 1), '…')
+        self.assertEqual(truncate(text, 2), 'ខេ…', "a consonant keeps its vowel sign")
+        self.assertEqual(truncate(text, 3), 'ខេត្ត…', "a subscript consonant stays with its base")
+        self.assertEqual(truncate(text, 9), text)
 
     def test_khmer_is_wider_than_latin(self):
         self.assertGreater(text_width_mm('ខេត្តកណ្តាល', 10), text_width_mm('Kandal Pro', 10))
@@ -501,10 +529,12 @@ class TestCodLabelReport(CodLabelCommon):
         none = self._create_picking(self.picking_type_out)
         html = self.env['ir.actions.report']._render_qweb_html(REPORT, (cod | paid | none).ids)[0].decode()
         self.assertEqual(html.count('o_kh_label_article'), 4, "one article per label")
-        for text in ('$17.00', '≈ 69,000៛', '$15.00', 'COD · ប្រាក់ត្រូវប្រមូល', 'PAID · បានទូទាត់រួច',
+        for text in ('$17.00', '≈ 69,000', '៛', 'ប្រាក់ត្រូវប្រមូល', 'PAID · ', 'បានទូទាត់រួច',
                      'DO NOT COLLECT', 'NO COD', 'កណ្តាល', '012 345 678', '1/2', '2/2', cod.name, none.name,
-                     'Total for 2 parcels'):
+                     'Total for 2 parcels', 'Nothing to collect'):
             self.assertIn(text, html)
+        # Khmer runs are printed in their own font stack (see kh_markup)
+        self.assertIn('<span class="o_kh_kb">កណ្តាល</span>', html)
 
 
 @tagged('post_install', '-at_install')
