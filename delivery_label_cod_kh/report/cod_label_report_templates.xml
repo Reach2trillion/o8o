@@ -345,7 +345,7 @@
                     <div t-if="label['items_lines'] and (label['items_rows'] or label['items_more'])"
                          t-attf-class="o_kh_items o_kh_rows o_kh_lines_#{len(label['items_rows']) or 1}" t-att-style="label['items_style']">
                         <b><span class="o_kh_kb">ទំនិញ</span> Items (<span class="o_kh_kb">ចំនួន</span> Qty <t t-out="label['total_qty']"/>): </b>
-                        <t t-if="label['items_rows']"><t t-foreach="label['items_rows']" t-as="row"><t t-out="kh(row)"/><b t-if="row_last and label['items_more']"> … +<t t-out="label['items_more']"/> more</b><br t-if="not row_last"/></t></t>
+                        <t t-if="label['items_rows']"><t t-foreach="label['items_rows']" t-as="row"><t t-out="kh(row)"/><b t-if="row_last and label['items_more_text']"> <t t-out="label['items_more_text']"/></b><br t-if="not row_last"/></t></t>
                         <t t-else=""><t t-out="label['items_more']"/> <span class="o_kh_kh">មុខ</span> <t t-if="label['items_more'] == 1">product</t><t t-else="">products</t></t>
                     </div>
                     <div t-if="label['note_rows']" t-attf-class="o_kh_note o_kh_rows o_kh_lines_#{label['note_lines']}" t-att-style="label['note_style']">

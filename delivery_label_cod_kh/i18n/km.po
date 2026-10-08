@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 18.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-08 11:16+0000\n"
+"POT-Creation-Date: 2026-10-08 12:18+0000\n"
 "PO-Revision-Date: 2026-10-08 11:16+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -54,7 +54,7 @@ msgstr ""
 #: model:ir.model.fields,help:delivery_label_cod_kh.field_res_config_settings__kh_label_pay_qr
 msgid ""
 "'Scan to pay' QR code printed next to the amount on COD labels only:\n"
-"- Odoo payment link: opens the payment page of the sales order with the COD amount (pay with any published payment provider, e.g. ABA KHQR). Transfers without sales order use the static KHQR image instead, when one is set.\n"
+"- Odoo payment link: opens the payment page of the sales order with the COD amount (pay with any published payment provider, e.g. ABA KHQR). Transfers without sales order, and orders no payment provider can be used for (none enabled or in test mode and published), use the static KHQR image instead, when one is set.\n"
 "- Static ABA KHQR image: the uploaded image; the customer types the amount.\n"
 "- Custom URL: the URL template below.\n"
 "- No payment QR."
@@ -78,6 +78,11 @@ msgstr ""
 #. module: delivery_label_cod_kh
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
 msgid "<i class=\"fa fa-exclamation-triangle me-1\" title=\"Warning\"/>"
+msgstr ""
+
+#. module: delivery_label_cod_kh
+#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
+msgid "<i class=\"fa fa-qrcode me-1\" title=\"Payment QR\"/>"
 msgstr ""
 
 #. module: delivery_label_cod_kh
@@ -394,6 +399,11 @@ msgstr ""
 "«ចំនួនបញ្ចូលដោយដៃ» ឬ «បានបង់រួច» មុនពេលបោះពុម្ពស្លាក COD។"
 
 #. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_khqr_image_warning
+msgid "KHQR Image Warning"
+msgstr "ការព្រមានរូបភាព KHQR"
+
+#. module: delivery_label_cod_kh
 #: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_khr_rate_source
 #: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_khr_rate_source
 msgid "KHR Rate Source"
@@ -484,6 +494,54 @@ msgstr ""
 #: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__stock_picking__kh_cod_state__none
 msgid "No COD"
 msgstr "មិនប្រមូលប្រាក់"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/res_config_settings.py:0
+msgid ""
+"No QR code was found in this image: the whole image is printed 18 mm wide "
+"and its QR code may be too small to scan. Upload only the square QR part of "
+"the ABA KHQR (crop the card)."
+msgstr ""
+"រកមិនឃើញ QR ក្នុងរូបភាពនេះទេ៖ រូបភាពទាំងមូលត្រូវបោះពុម្ពទទឹង 18 មម ហើយ QR "
+"របស់វាអាចតូចពេក មិនអាចស្កេនបាន។ សូមបញ្ចូលតែផ្នែក QR ការ៉េនៃ ABA KHQR "
+"ប៉ុណ្ណោះ (កាត់កាតចេញ)។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid ""
+"No online payment provider is enabled (or in test mode) and published for "
+"%(company)s in %(currency)s: the payment link would open a page where the "
+"customer cannot pay, so %(printed)s. Enable one in Invoicing (or Website) > "
+"Configuration > Payment Providers. A database copy made with 'Neutralize' "
+"has its providers disabled."
+msgstr ""
+"គ្មានអ្នកផ្តល់សេវាបង់ប្រាក់អនឡាញណាមួយត្រូវបានបើក (ឬក្នុងរបៀបសាកល្បង) "
+"និងផ្សព្វផ្សាយ សម្រាប់ %(company)s ជា %(currency)s ទេ៖ "
+"តំណបង់ប្រាក់នឹងបើកទំព័រដែលអតិថិជនមិនអាចបង់ប្រាក់បាន ដូច្នេះ %(printed)s។ "
+"សូមបើកអ្នកផ្តល់សេវាមួយនៅក្នុង Invoicing (ឬ Website) > Configuration > "
+"Payment Providers។ ច្បាប់ចម្លងមូលដ្ឋានទិន្នន័យដែលបង្កើតដោយ «Neutralize» "
+"មានអ្នកផ្តល់សេវាត្រូវបានបិទ។"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/res_config_settings.py:0
+msgid ""
+"No online payment provider is enabled (or in test mode) and published: a "
+"payment link would open a page where the customer cannot pay, so COD labels "
+"print the static ABA KHQR image below when it is set, else no payment QR "
+"code. Enable one in Invoicing (or Website) > Configuration > Payment "
+"Providers. A database copy made with 'Neutralize' has its providers "
+"disabled."
+msgstr ""
+"គ្មានអ្នកផ្តល់សេវាបង់ប្រាក់អនឡាញណាមួយត្រូវបានបើក (ឬក្នុងរបៀបសាកល្បង) "
+"និងផ្សព្វផ្សាយទេ៖ តំណបង់ប្រាក់នឹងបើកទំព័រដែលអតិថិជនមិនអាចបង់ប្រាក់បាន "
+"ដូច្នេះស្លាក COD បោះពុម្ពរូបភាព ABA KHQR ថេរខាងក្រោម ប្រសិនបើមាន "
+"បើមិនដូច្នោះទេ គ្មាន QR បង់ប្រាក់ទេ។ សូមបើកអ្នកផ្តល់សេវាមួយនៅក្នុង Invoicing"
+" (ឬ Website) > Configuration > Payment Providers។ "
+"ច្បាប់ចម្លងមូលដ្ឋានទិន្នន័យដែលបង្កើតដោយ «Neutralize» "
+"មានអ្នកផ្តល់សេវាត្រូវបានបិទ។"
 
 #. module: delivery_label_cod_kh
 #: model:ir.model.fields.selection,name:delivery_label_cod_kh.selection__res_company__kh_label_pay_qr__none
@@ -604,6 +662,11 @@ msgid "Payment Link"
 msgstr "តំណបង់ប្រាក់"
 
 #. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_config_settings__kh_label_pay_provider_warning
+msgid "Payment Provider Warning"
+msgstr "ការព្រមានអ្នកផ្តល់សេវាបង់ប្រាក់"
+
+#. module: delivery_label_cod_kh
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
 msgid "Payment Providers"
 msgstr "អ្នកផ្តល់សេវាបង់ប្រាក់"
@@ -618,6 +681,11 @@ msgstr "QR បង់ប្រាក់"
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
 msgid "Payment QR Code (COD)"
 msgstr "QR បង់ប្រាក់ (COD)"
+
+#. module: delivery_label_cod_kh
+#: model:ir.model.fields,field_description:delivery_label_cod_kh.field_stock_picking__kh_pay_qr_warning
+msgid "Payment QR Warning"
+msgstr "ការព្រមាន QR បង់ប្រាក់"
 
 #. module: delivery_label_cod_kh
 #: model:ir.model.fields,field_description:delivery_label_cod_kh.field_res_company__kh_label_pay_url_template
@@ -749,7 +817,8 @@ msgstr "រូបភាព ABA KHQR ថេរ"
 msgid ""
 "Static ABA KHQR payment QR code of the shop. Printed as the payment QR of "
 "COD labels in 'Static ABA KHQR image' mode, and as fallback of the Odoo "
-"payment link for transfers without sales order."
+"payment link (transfers without sales order, no payment provider). The QR "
+"code is found in the image, so the whole ABA KHQR card can be uploaded."
 msgstr ""
 
 #. module: delivery_label_cod_kh
@@ -862,9 +931,9 @@ msgstr ""
 #. module: delivery_label_cod_kh
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
 msgid ""
-"Upload the QR code of the shop (ideally the square code itself, cropped from the ABA\n"
-"                                    card): it is cropped to its ink and printed 18 mm wide, and the customer types the\n"
-"                                    amount shown next to it."
+"Upload the QR code of the shop (the square code itself, or the ABA KHQR card: the\n"
+"                                    code is found in it): it is printed 18 mm wide in black and white, and the customer\n"
+"                                    types the amount shown next to it."
 msgstr ""
 
 #. module: delivery_label_cod_kh
@@ -886,6 +955,13 @@ msgid ""
 msgstr ""
 
 #. module: delivery_label_cod_kh
+#: model:ir.model.fields,help:delivery_label_cod_kh.field_stock_picking__kh_pay_qr_warning
+msgid ""
+"Why the Odoo payment link is not printed as the payment QR code of this COD "
+"label (no payment provider the customer can pay with)."
+msgstr ""
+
+#. module: delivery_label_cod_kh
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.view_picking_form_cod_label
 msgid "e.g. 012 345 678"
 msgstr "ឧ. 012 345 678"
@@ -898,11 +974,6 @@ msgstr "ឧ. តេមុនម៉ោង៥ល្ងាច"
 #. module: delivery_label_cod_kh
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.res_config_settings_view_form_cod_label
 msgid "https://pay.example.com/?ref={order}&amount={amount}&ccy={currency}"
-msgstr ""
-
-#. module: delivery_label_cod_kh
-#: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
-msgid "more"
 msgstr ""
 
 #. module: delivery_label_cod_kh
@@ -919,6 +990,18 @@ msgstr ""
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items
 msgid "products"
 msgstr ""
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid "the label prints no payment QR code"
+msgstr "ស្លាកមិនបោះពុម្ព QR បង់ប្រាក់ទេ"
+
+#. module: delivery_label_cod_kh
+#. odoo-python
+#: code:addons/delivery_label_cod_kh/models/stock_picking.py:0
+msgid "the label prints the static ABA KHQR image instead"
+msgstr "ស្លាកបោះពុម្ពរូបភាព ABA KHQR ថេរជំនួសវិញ"
 
 #. module: delivery_label_cod_kh
 #: model_terms:ir.ui.view,arch_db:delivery_label_cod_kh.report_cod_label_items

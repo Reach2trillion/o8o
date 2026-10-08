@@ -38,16 +38,6 @@ def _px(style, prop='height'):
 
 class ReviewCommon(CodLabelCommon):
 
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        payment_method = cls.env.ref('payment.payment_method_unknown')
-        cls.provider = cls.env['payment.provider'].create({
-            'name': 'Dummy (test)', 'code': 'none', 'state': 'test', 'company_id': cls.company.id,
-            'payment_method_ids': [Command.set(payment_method.ids)],
-        })
-        payment_method.active = True
-
     def _done_transaction(self, order, amount, payment=None):
         """Online payment of ``order`` (e.g. made with the "scan to pay" QR code of the label)."""
         transaction = self.env['payment.transaction'].create({
@@ -340,10 +330,6 @@ class TestReviewPaymentQr(ReviewCommon):
 @tagged('post_install', '-at_install')
 class TestReviewPaymentLinkHttp(ReviewCommon, HttpCase):
     """An old label's payment link never charges more than what is still due."""
-
-    def setUp(self):
-        super().setUp()
-        self.provider.is_published = True
 
     def test_link_capped_at_amount_due(self):
         order = self._create_order()

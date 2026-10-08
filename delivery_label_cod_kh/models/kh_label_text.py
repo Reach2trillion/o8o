@@ -3,14 +3,19 @@
 
 wkhtmltopdf cannot shrink text to fit a box, so the label values are fitted server side: the
 width of a string is estimated from per-character widths measured in wkhtmltopdf 0.12.6 with
-the label font stack (Arial / Liberation Sans for Latin, Khmer OS Battambang for Khmer):
+the label font stacks (Arial / Liberation Sans for Latin, Khmer OS Battambang for regular Khmer,
+Noto Sans Khmer Bold for bold Khmer), then inflated by ``SAFETY``:
 
 * Latin (Arial metrics): lowercase ~0.48 em, uppercase ~0.67 em, digits 0.556 em, bold +8 %;
-* Khmer: consonants and independent vowels ~0.85 em, spacing vowel signs ~0.45 em, Khmer
-  digits ~0.76 em; non-spacing signs and subscript consonants (after COENG) take no width.
+* Khmer: the advance of each character measured in PDFs rendered by wkhtmltopdf (PyMuPDF), see
+  ``KHMER_WIDTHS``: consonants 0.34 to 1.37 em, spacing vowel signs 0.29 to 0.69 em, Khmer
+  digits ~0.76 em; vowels and signs above / below a letter and most subscript consonants (after
+  COENG) take no width; a mark typed in an order the shaper cannot render gets a dotted circle.
+  On real texts (provinces, names, addresses, notes, captions at 6 to 15 pt) the estimate is
+  within a pixel of the rendered width.
 
-A Khmer consonant is almost twice as wide as a Latin letter, so character counts alone are
-misleading (a 40 character Khmer name does not fit where a 40 character Latin name does).
+A Khmer consonant is wider than a Latin letter, so character counts alone are misleading (a 40
+character Khmer name does not fit where a 40 character Latin name does).
 Character limits count visible characters: a Khmer syllable written with subscript consonants
 and vowel signs (2 to 4 code points) counts once per base consonant.
 
@@ -33,6 +38,35 @@ MM_PER_PX = 25.4 / 96.0
 KHMER_COENG = '្'
 ELLIPSIS = '…'
 SAFETY = 1.06  # estimated widths are inflated by 6 % before comparing with the box width
+
+# Advance widths (em) of the Khmer characters in wkhtmltopdf 0.12.6 with the label font stacks,
+# (regular: Khmer OS Battambang, bold: Noto Sans Khmer Bold), measured in PDFs with PyMuPDF.
+# Vowel signs and signs not listed are drawn above / below their letter and take no room. Noto Sans
+# Khmer Regular (used when Khmer OS Battambang is not installed) is narrower than both columns.
+KHMER_WIDTHS = {
+    'ក': (.682, .680), 'ខ': (.682, .680), 'គ': (.682, .680), 'ឃ': (1.025, .978), 'ង': (.682, .688), 'ច': (.682, .677),
+    'ឆ': (.682, .693), 'ជ': (.682, .693), 'ឈ': (1.367, 1.295), 'ញ': (1.025, 1.000), 'ដ': (.682, .680), 'ឋ': (.682, .688),
+    'ឌ': (.682, .677), 'ឍ': (1.025, .973), 'ណ': (1.367, 1.285), 'ត': (.682, .680), 'ថ': (.682, .693), 'ទ': (.682, .640),
+    'ធ': (.682, .693), 'ន': (.682, .675), 'ប': (.682, .682), 'ផ': (.682, .693), 'ព': (.682, .672), 'ភ': (.682, .670),
+    'ម': (.682, .682), 'យ': (1.025, .988), 'រ': (.343, .362), 'ល': (1.025, .970), 'វ': (.343, .395), 'ឝ': (.682, .682),
+    'ឞ': (.682, .685), 'ស': (1.025, .973), 'ហ': (1.025, .973), 'ឡ': (1.025, .920), 'អ': (.682, .688), 'ឣ': (.682, .688),
+    'ឤ': (1.025, .985), 'ឥ': (.682, .682), 'ឦ': (1.025, .958), 'ឧ': (.682, .680), 'ឨ': (.682, .680), 'ឩ': (.733, .810),
+    'ឪ': (.682, .682), 'ឫ': (.682, .685), 'ឬ': (.682, .723), 'ឭ': (.682, .675), 'ឮ': (.682, .733), 'ឯ': (.682, .675),
+    'ឰ': (.682, .672), 'ឱ': (.682, .677), 'ឲ': (.708, .615), 'ឳ': (.682, .667), '\u17b4': (.100, .307),
+    '\u17b5': (.100, .307), 'ា': (.343, .292), 'ើ': (.343, .312), 'ឿ': (.685, .605), 'ៀ': (.685, .613),
+    'េ': (.343, .312), 'ែ': (.343, .312), 'ៃ': (.343, .323), 'ោ': (.685, .605), 'ៅ': (.685, .605), 'ះ': (.465, .405),
+    'ៈ': (.415, .282), '។': (.757, .585), '៕': (.902, .785), '៖': (.562, .477), 'ៗ': (.728, .585), '៘': (2.540, 2.112),
+    '៙': (.757, .733), '៚': (1.915, 1.380), '៛': (.343, .383), 'ៜ': (.757, .728), '០': (.757, .672), '១': (.757, .672),
+    '២': (.835, .835), '៣': (.882, .897), '៤': (.757, .685), '៥': (.757, .662), '៦': (.757, .672), '៧': (.880, .848),
+    '៨': (.757, .672), '៩': (.757, .672),
+}
+# subscript consonants (COENG + letter) that take room; the others are drawn under their base letter
+KHMER_SUBSCRIPT_WIDTHS = {
+    'ឃ': (.343, .312), 'ឈ': (.343, .290), 'ឍ': (.343, .305), 'ប': (.343, .295), 'យ': (.343, .295), 'រ': (.343, .270),
+    'ឞ': (.343, .685), 'ស': (.350, .302), 'ឡ': (1.028, .922),
+}
+KHMER_SHIFTERS = '៉៊'  # register shifters (MUUSIKATOAN, TRIISAP)
+KHMER_DOTTED_CIRCLE = (.64, .65)  # drawn under a mark that cannot attach to a letter (misordered input)
 
 # Vertical metrics (em) used by text_box(), measured on Liberation Sans and Khmer OS Battambang.
 BASELINE_OFFSET = 0.3465  # baseline = line height / 2 + 0.3465 em (Liberation Sans: (0.905 - 0.212) / 2)
@@ -124,19 +158,15 @@ def collapse(text):
     return re.sub(r'\s+', ' ', text or '').strip()
 
 
-def char_width_em(char, bold=False, after_coeng=False):
+def char_width_em(char, bold=False):
+    """Width of a non-Khmer character (Arial metrics), or of a Khmer letter written alone."""
+    if char in KHMER_WIDTHS:
+        return KHMER_WIDTHS[char][1 if bold else 0]
     code = ord(char)
     if 0x1780 <= code <= 0x17FF:
-        if after_coeng or char == KHMER_COENG:
-            return 0.0
-        if 0x17E0 <= code <= 0x17E9:
-            return 0.76
-        category = unicodedata.category(char)
-        if category == 'Lo':
-            return 0.85
-        if category == 'Mc':
-            return 0.45
-        return 0.0
+        return {'Lo': 1.025, 'Mc': .685, 'Mn': 0.0}.get(unicodedata.category(char), .76)  # not measured
+    if 0x19E0 <= code <= 0x19FF:
+        return 1.0  # Khmer symbols
     if unicodedata.category(char) in ('Mn', 'Me', 'Cf'):
         return 0.0
     if char == ' ':
@@ -154,13 +184,68 @@ def char_width_em(char, bold=False, after_coeng=False):
     return width * 1.08 if bold else width
 
 
+def _khmer_mark_kind(char):
+    """'shifter', 'vowel' or 'sign' for a Khmer combining character (COENG excluded), else None."""
+    if char in KHMER_SHIFTERS:
+        return 'shifter'
+    code = ord(char)
+    if 0x17B6 <= code <= 0x17C5:
+        return 'vowel'
+    if 0x17C6 <= code <= 0x17D3 or code == 0x17DD:
+        return 'sign'
+    return None
+
+
 def text_width_em(text, bold=False):
+    """Width of ``text`` in em: Arial metrics for Latin, measured Khmer widths (see KHMER_WIDTHS).
+
+    Khmer is written in clusters: a base letter, at most two subscript consonants (COENG + letter,
+    the subscript RO last), a register shifter, one vowel sign, then other signs. A mark that does
+    not fit this order (no base before it, a second vowel, a vowel after a sign, a subscript
+    after the vowel or after the subscript RO, as in "ស្រ្តី" or "កំុ" typed in the wrong
+    order) is drawn by wkhtmltopdf on a dotted circle, which takes room.
+    """
+    column = 1 if bold else 0
     width = 0.0
-    previous = ''
-    for char in text or '':
-        width += char_width_em(char, bold=bold, after_coeng=previous == KHMER_COENG)
-        previous = char
+    cluster = None  # marks of the Khmer cluster being written; None: no letter to attach a mark to
+    chars = text or ''
+    index = 0
+    while index < len(chars):
+        char = chars[index]
+        index += 1
+        if char in '\u200c\u200d':  # zero width (non) joiner: part of the cluster
+            continue
+        if char == KHMER_COENG:
+            subscript = chars[index] if index < len(chars) and '\u1780' <= chars[index] <= '\u17a2' else ''
+            index += bool(subscript)
+            if (cluster is None or cluster['vowel'] or cluster['signs'] or cluster['ro']
+                    or cluster['subscripts'] >= 2):
+                width += KHMER_DOTTED_CIRCLE[column]
+                cluster = _new_cluster()
+            cluster['subscripts'] += 1
+            cluster['ro'] = subscript == 'រ'
+            width += KHMER_SUBSCRIPT_WIDTHS.get(subscript, (0.0, 0.0))[column]
+            continue
+        kind = _khmer_mark_kind(char)
+        if kind:
+            if cluster is None or (kind == 'sign' and char in cluster['signs']) or (kind != 'sign' and (
+                    cluster['vowel'] or cluster['signs'] or (kind == 'shifter' and cluster['shifter']))):
+                width += KHMER_DOTTED_CIRCLE[column]
+                cluster = _new_cluster()
+            if kind == 'sign':
+                cluster['signs'].add(char)
+            else:
+                cluster[kind] = True
+            width += char_width_em(char, bold=bold)
+            continue
+        # a letter starts a cluster; anything else (space, Latin, Khmer digit...) ends it
+        cluster = _new_cluster() if '\u1780' <= char <= '\u17b3' else None
+        width += char_width_em(char, bold=bold)
     return width
+
+
+def _new_cluster():
+    return {'subscripts': 0, 'ro': False, 'shifter': False, 'vowel': False, 'signs': set()}
 
 
 def text_width_mm(text, size_pt, bold=False):

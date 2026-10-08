@@ -12,7 +12,7 @@ dither them).
 | **Header** | Company logo (converted to pure black and white), name, optional tagline, phone (`031 266 3333`) / transfer reference (never cut: smaller font, or `…/OUT/00620`), sales order, date / courier, parcel `1/3`, weight |
 | **Receiver** | Name (phone numbers typed in the name are removed), **phone in 18 pt** (or a blank line to fill by hand), address (street, street 2), **province box** (`រាជធានី/ខេត្ត` + `ខេត្តកណ្តាល` + the city / district, e.g. `ក្រុងតាខ្មៅ`, which riders route by) |
 | **Payment** (the anchor) | **COD**: black box, amount ~25 pt, `≈ 69,000៛`, "Goods $15.00 + Delivery $2.00", "Total for 3 parcels, collect once", **"SCAN TO PAY $17.00 ▶"** + payment QR. **PAID**: thick frame "PAID · DO NOT COLLECT". **NO COD**: thin frame |
-| **Items** | `ទំនិញ Items (ចំនួន Qty 3): 2× Serum 30ml, 1× Cream … +2 more`, note, chips "FRAGILE" and "Allow check" / "No check" (always one of the two) |
+| **Items** | `ទំនិញ Items (ចំនួន Qty 3): 2× Serum 30ml, 1× Cream … +2 more`, note, chips "FRAGILE" and "Allow check" / "No check" (always one of the two). The items line always keeps at least one row (`ទំនិញ Items (ចំនួន Qty N)`, riders check the quantity on "allow check" deliveries): a long note gets the rest (up to two rows, 6 pt when that shows more of it, then cut with `…`) |
 | **Footer** | Code128 barcode of the transfer (Barcode app), drawn as sharp vector bars, and the thank-you text |
 
 One label per parcel (`kh_parcel_count`), one PDF page per label, no blank page when printing
@@ -47,7 +47,7 @@ several transfers at once.
 1. Copy `delivery_label_cod_kh` into your addons path, update the apps list and install
    **Cambodia COD Delivery Label (100x80)**.
 2. Configure *Inventory > Configuration > Settings > COD Delivery Label* (below).
-3. Print a test label (see *Printer setup*) before using it for real parcels.
+3. Print test labels (see *Testing safely* and *Printer setup*) before using it for real parcels.
 
 ## Configuration (Inventory > Settings > COD Delivery Label)
 
@@ -61,7 +61,7 @@ All settings are per company.
 | Print riel equivalent | on | `≈ 69,000៛` next to a dollar amount, `≈ $16.74` next to a riel amount. Never on PAID / NO COD labels. |
 | Orders without delivery fee | Print nothing | Line printed under the amount when the order has no delivery fee, so a courier knows whether to add its own fee: *Free delivery* (`ដឹកជញ្ជូនឥតគិតថ្លៃ · Free delivery: collect this amount only`) or *The receiver pays the courier separately* (`ថ្លៃដឹកមិនរួមបញ្ចូល · Delivery fee not included`). Who pays delivery is a shop policy the module cannot guess. |
 | **Payment QR code (COD)** | Odoo payment link | See *Payment QR* below: *Odoo payment link of the sales order*, *Static ABA KHQR image*, *Custom URL* or *No payment QR*. |
-| ABA KHQR image | - | Static KHQR of the shop (max 512 px), for the *Static ABA KHQR image* mode and as fallback of the Odoo link. Cropped to its ink and printed in black and white, 18 mm wide. |
+| ABA KHQR image | - | Static KHQR of the shop (max 512 px), for the *Static ABA KHQR image* mode and as fallback of the Odoo link. Upload a straight image (a screenshot or the downloaded PNG, not a tilted photo): a code rotated by a few degrees is still printed and scanned, but its corners may be clipped. The QR code is located in the image (the whole ABA KHQR card can be uploaded: banner, merchant name and amount are left out) and printed alone, in black and white, 18 mm wide. When no QR code is found the image is cropped to its ink as is, and Settings asks to upload only the square QR part. |
 | Payment URL template | - | For *Custom URL*, e.g. `https://pay.example.com/?ref={order}&amount={amount}&ccy={currency}`. |
 | **Label info QR code** | Receiver location | *Receiver location*: Google Maps link `https://maps.google.com/?q=<lat>,<lng>` of the contact's geolocation (the transfer reference when the contact has none); *Transfer reference*; *Nothing*. |
 | Print item summary | on | List the products (disable it for discreet parcels). |
@@ -153,8 +153,8 @@ parcels prints it on parcel 1/N only (the amount is the total, paid once); the o
 
 | Mode | QR content |
 |---|---|
-| **Odoo payment link** (default) | The standard payment link of the sales order, built with Odoo's *Generate a Payment Link* wizard: `{base URL}/payment/pay?amount=17.0&access_token=...&sale_order_id=42`, for **exactly the amount printed** (order currency). The customer opens the Odoo payment page of the order and pays with any **published payment provider** (e.g. ABA PayWay "ABA KHQR"). The transaction is linked to the order: once it is done, `amount_paid` rises and a re-printed label says PAID. The link works for confirmed orders (the controller only checks the token). Transfers **without sales order** (manual amount) print the static KHQR image when one is set, else no payment QR. |
-| **Static ABA KHQR image** | The uploaded image, cropped to its ink and converted to black and white; the customer types the amount shown in the caption (`ABA KHQR · SCAN TO PAY $17.00`). Upload the square QR itself (crop the ABA card), the code then prints 18 mm wide. |
+| **Odoo payment link** (default) | The standard payment link of the sales order, built with Odoo's *Generate a Payment Link* wizard: `{base URL}/payment/pay?amount=17.0&access_token=...&sale_order_id=42`, for **exactly the amount printed** (order currency). The customer opens the Odoo payment page of the order and pays with any **published payment provider** (e.g. ABA PayWay "ABA KHQR"). Printed only when such a provider exists (see *Payment providers* below). The transaction is linked to the order: once it is done, `amount_paid` rises and a re-printed label says PAID. The link works for confirmed orders (the controller only checks the token). Transfers **without sales order** (manual amount) print the static KHQR image when one is set, else no payment QR. |
+| **Static ABA KHQR image** | The QR code of the uploaded image (found in an uncropped ABA card too), converted to black and white and printed 18 mm wide; the customer types the amount shown in the caption (`ABA KHQR · SCAN TO PAY $17.00`). |
 | **Custom URL** | The URL template with `{order}`, `{picking}`, `{amount}` (`17.00`), `{currency}` (`USD`), `{partner}` (receiver name as printed, without the phone numbers typed in the contact name), each URL-encoded. A format spec is ignored (`{amount:.2f}` is `{amount}`); unknown placeholders and other braces are left as typed (never an error). Empty template, or a URL longer than 1024 characters = no payment QR. |
 | **No payment QR** | - |
 
@@ -167,11 +167,25 @@ Setup checklist for the Odoo link:
   domain of the order's (or company's) website is used when one is set.
 * At least one payment provider enabled **and published** for the company and the currency of the
   orders (*Invoicing > Configuration > Payment Providers*, or the *Payment Providers* link of the
-  setting).
-* Links are signed with the database secret: they stay valid after a database restore / copy, and
-  can be built outside of an HTTP request (PDF rendered by a scheduled action, the shell, tests).
-  The module makes `payment.link.wizard` compute the very same token there (Odoo's helper reads it
+  setting), see *Payment providers* below.
+* Links are signed with the database secret (system parameter `database.secret`): a link works
+  only on the database that printed it, as long as that database keeps its secret. **Duplicating
+  a database, or restoring a backup as a copy** ("This database is a copy", the default), gives it
+  a new secret: links printed before do not work on it ("The provided parameters are invalid.");
+  restore with "This database was moved" to keep the secret when a database changes server. Links
+  can be built outside of an HTTP request (PDF rendered by a scheduled action, the shell, tests):
+  the module makes `payment.link.wizard` compute the very same token there (Odoo's helper reads it
   from the HTTP request only).
+
+**Payment providers**: a QR code to a payment page where the customer cannot pay is worse than no
+QR code, so the Odoo link is printed only when its payment page offers a provider: enabled or in
+test mode, **published** (customers never see unpublished providers; switching a provider to test
+mode unpublishes it), of the company of the order and compatible with its currency, the country of
+its invoicing contact and the amount (the very check of Odoo's payment page). Otherwise the label
+prints the static KHQR image when one is set, else no payment QR, and says why on the transfer
+(*COD Label* tab) and in Settings. This happens on a database duplicated or restored with
+**Neutralize**: Odoo's `payment/data/neutralize.sql` disables every enabled provider (providers in
+test mode are left as they are).
 
 **Placement of the info QR**: the payment QR takes the QR slot of the payment section. On those
 COD labels the **map** QR moves to the receiver section (next to the province box, caption
@@ -194,6 +208,29 @@ changed.
   down.
 * The static KHQR mode cannot pre-fill the amount (the customer types it).
 
+## Testing safely (without a test server)
+
+1. **Test on a neutralized copy**: *Database Manager* (`/web/database/manager`) > **Duplicate**,
+   tick **Neutralize**, and print the labels on the copy (COD, paid, no COD, several parcels).
+   Neutralizing disables the scheduled actions, the outgoing mail and the enabled payment
+   providers of the copy: it prints **no Odoo payment QR code**, on purpose (see *Payment
+   providers*), unless a provider was left in *test* mode (those are not disabled). The static KHQR image, when one is set, still prints: it is the shop's real
+   account, do not pay it.
+2. **Never hand out a label printed on a copy.** The copy has a new `database.secret`, and
+   Duplicate resets `web.base.url` to `http://localhost:<port>` (the next administrator login sets
+   the copy's address, unless `web.base.url.freeze` is set); with the *Website* app, a domain set
+   on the website (the production domain) is used instead. The QR code of such a label does not
+   open, or opens the production site, which refuses it ("The provided parameters are invalid."). A copy
+   duplicated without *Neutralize* also keeps the real providers: money paid through it would be
+   recorded in the copy only.
+3. **Test the real payment once, on production**: a small real COD order to yourself (e.g.
+   $0.10), print its label, scan the QR code with ABA Mobile and pay; the order shows the payment,
+   a re-printed label says PAID and the QR code of the first label now says *There is nothing to
+   pay*. Then refund it (ABA merchant portal, or the provider in Odoo if it supports refunds) and
+   cancel the order.
+4. **Rule for the riders**: when the customer pays with the QR code, check the ABA success screen
+   on the customer's phone (amount and shop name) and do not take cash for that parcel.
+
 ## Printer setup
 
 * Media / label size **100 mm x 80 mm** (width x height), the paper format of the report is
@@ -206,8 +243,8 @@ changed.
   is pure black and white (the logo and the KHQR image are converted), so no dithering setting is
   needed. The Code128 barcode is drawn with vector bars (0.32 mm per module, 0.29 mm for
   longer references such as `ABJSK/OUT/00620`, quiet zones of 10 modules) and prints sharp; it is 4.2 mm
-  high, the vertical room of a 80 mm label. Verified to decode at 203 dpi (and at 150 dpi with
-  threshold or error diffusion for references of the `SO/OUT/00620` kind).
+  high, the vertical room of a 80 mm label. Verified to decode at 203 dpi; it usually decodes at
+  150 dpi too.
   Supply the logo as black on white for the best result (colours are thresholded).
 * Test with a COD label that has a payment QR: scan it with a phone before printing in bulk.
 
@@ -231,8 +268,10 @@ These steps are deliberately manual: the module does not touch the old modules.
   sections (`report_cod_label_head`, `_receiver`, `_payment`, `_items`, `_foot`, `_style`).
 * wkhtmltopdf 0.12 (old WebKit) has no flexbox / grid / CSS variables: the layout uses fixed-layout
   tables with absolute millimetre heights and clipped boxes; long texts are measured and truncated
-  server side (`models/kh_label_text.py`, calibrated widths of Latin and Khmer glyphs, cuts never
-  split a Khmer syllable), font sizes are chosen per label (long names / amounts get smaller).
+  server side (`models/kh_label_text.py`: Arial metrics for Latin, the width of every Khmer
+  character measured in PDFs of wkhtmltopdf 0.12.6 with the label fonts, within a pixel of the
+  rendered width plus a 6 % margin; cuts never split a Khmer syllable), font sizes are chosen per
+  label (long names / amounts get smaller).
 * wkhtmltopdf truncates lengths to whole CSS pixels and places every baseline with the metrics of
   Arial, while Khmer stacks (subscript + lower vowel) go 0.64 em below the baseline and vowels up to
   1.2 em above it: the layout is written in pixels and the height of every text box is computed

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import base64
+import functools
 import io
 import logging
 import math
@@ -59,6 +60,7 @@ PHONE_RE = re.compile(
     r'(?!\d)'
 )
 PHONE_SPLIT_RE = re.compile(r'\s*[/,;|]\s*')
+NAME_SEPARATORS = ' ,;:-/|'  # tidied next to a phone number removed from a contact name
 KHMER_DIGITS = str.maketrans('០១២៣៤៥៦៧៨៩', '0123456789')
 
 MAP_URL = 'https://maps.google.com/?q=%.7f,%.7f'
@@ -120,7 +122,7 @@ ITEMS_H = 35
 ITEMS_PAD_X = 12
 CHIPS_CELL_W = 156
 ITEMS_SIZE = 6.5
-NOTE_SIZE = 6.5
+NOTE_SIZES = (6.5, 6)  # a long note shrinks to 6 pt before it takes the row of the items summary
 NOTE_PREFIX = 'ចំណាំ Note: '
 ITEMS_PREFIX = 'ទំនិញ Items (ចំនួន Qty %s): '
 # footer (26 px high): Code128 barcode | thank-you text
@@ -221,6 +223,141 @@ def kh_to_black_and_white(image, threshold=None):
     return gray.point(lambda value: 0 if value <= threshold else 255, 'L')
 
 
+QR_RUN_RE = re.compile(rb'\x00+|\xff+')
+QR_FINDER_RATIOS = (1, 1, 3, 1, 1)
+
+
+def _kh_finder_ratio_ok(lengths):
+    """True when 5 runs (dark, light, dark, light, dark) have the 1:1:3:1:1 ratio of a QR finder pattern."""
+    unit = sum(lengths) / 7.0
+    return unit >= 1 and all(abs(length - ratio * unit) < ratio * unit / 2.0
+                             for length, ratio in zip(lengths, QR_FINDER_RATIOS))
+
+
+def _kh_finder_at(runs, position):
+    """Finder pattern centred on the dark run of ``runs`` holding ``position``: ``(centre, start, end, total)``."""
+    index = next((i for i, (start, end, _dark) in enumerate(runs) if start <= position < end), None)
+    if index is None or index < 2 or index + 2 >= len(runs) or not runs[index][2]:
+        return None
+    window = runs[index - 2:index + 3]
+    if not _kh_finder_ratio_ok([end - start for start, end, _dark in window]):
+        return None
+    start, end = window[2][0], window[2][1]
+    return (start + end) / 2.0, window[0][0], window[4][1], window[4][1] - window[0][0]
+
+
+def kh_find_qr_box(image):
+    """Box ``(left, top, right, bottom)`` of the QR code drawn in a black and white ``L`` image, or None.
+
+    For a shop's KHQR uploaded as the whole ABA card (coloured banner, merchant name and amount
+    above the code): the three finder patterns (the squares in three corners of a QR code, runs
+    dark-light-dark-light-dark of 1:1:3:1:1 modules across and down) are located, and the three of
+    a similar size forming a right angle with equal sides give the code (the largest one when
+    several are found). The box is the outer edge of the three patterns. Codes rotated by a
+    multiple of 90 degrees are found too. A photo tilted by a few degrees is usually still found,
+    but the box is axis-aligned, so the corners of the tilted code may be clipped; nothing at all
+    found gives None (the caller keeps the whole image).
+    """
+    width, height = image.size
+    if min(width, height) < 21:
+        return None
+    rows = image.tobytes()
+    columns = image.transpose(Image.Transpose.TRANSPOSE).tobytes()
+
+    def runs_of(data, index, length):
+        line = data[index * length:(index + 1) * length]
+        return [(match.start(), match.end(), match.group()[0] == 0) for match in QR_RUN_RE.finditer(line)]
+
+    column_runs = {}
+    clusters = []  # [hits, sum x, sum y, sum module, [left, top, right, bottom] sums]
+    for y in range(height):
+        runs = runs_of(rows, y, width)
+        for index in range(len(runs) - 4):
+            if not runs[index][2]:
+                continue
+            window = runs[index:index + 5]
+            if not _kh_finder_ratio_ok([end - start for start, end, _dark in window]):
+                continue
+            x = int((window[2][0] + window[2][1]) / 2)
+            if x not in column_runs:
+                column_runs[x] = runs_of(columns, x, height)
+            down = _kh_finder_at(column_runs[x], y)
+            if not down or not 0.5 < down[3] / float(window[4][1] - window[0][0]) < 2.0:
+                continue
+            across = _kh_finder_at(runs_of(rows, int(down[0]), width), x)  # through the centre
+            if not across:
+                continue
+            centre_x, centre_y, module = across[0], down[0], (across[3] + down[3]) / 14.0
+            box = (across[1], down[1], across[2], down[2])
+            for cluster in clusters:
+                hits = cluster[0]
+                if (abs(cluster[1] / hits - centre_x) <= 2 * module and abs(cluster[2] / hits - centre_y) <= 2 * module
+                        and 0.7 < cluster[3] / hits / module < 1.4):
+                    cluster[:4] = [hits + 1, cluster[1] + centre_x, cluster[2] + centre_y, cluster[3] + module]
+                    cluster[4] = [total + value for total, value in zip(cluster[4], box)]
+                    break
+            else:
+                clusters.append([1, centre_x, centre_y, module, list(box)])
+    patterns = sorted(
+        ((cluster[0], cluster[1] / cluster[0], cluster[2] / cluster[0], cluster[3] / cluster[0],
+          [value / cluster[0] for value in cluster[4]]) for cluster in clusters if cluster[0] >= 2),
+        reverse=True)[:12]
+    best = None
+    for first in range(len(patterns)):
+        for second in range(first + 1, len(patterns)):
+            for third in range(second + 1, len(patterns)):
+                trio = (patterns[first], patterns[second], patterns[third])
+                modules = [pattern[3] for pattern in trio]
+                if max(modules) > 1.4 * min(modules):
+                    continue
+                module = sum(modules) / 3.0
+                for corner in range(3):
+                    origin, side_a, side_b = trio[corner], trio[corner - 1], trio[corner - 2]
+                    ax, ay = side_a[1] - origin[1], side_a[2] - origin[2]
+                    bx, by = side_b[1] - origin[1], side_b[2] - origin[2]
+                    length_a, length_b = math.hypot(ax, ay), math.hypot(bx, by)
+                    if (min(length_a, length_b) < 13 * module or abs(length_a - length_b) > 0.1 * max(length_a, length_b)
+                            or abs(ax * bx + ay * by) > 0.1 * length_a * length_b):
+                        continue
+                    left = min(pattern[4][0] for pattern in trio)
+                    top = min(pattern[4][1] for pattern in trio)
+                    right = max(pattern[4][2] for pattern in trio)
+                    bottom = max(pattern[4][3] for pattern in trio)
+                    if abs((right - left) - (bottom - top)) > 0.1 * max(right - left, bottom - top):
+                        continue  # not a square: not axis-aligned
+                    if not best or right - left > best[2] - best[0]:
+                        best = (left, top, right, bottom)
+    if not best:
+        return None
+    return tuple(int(round(value)) for value in best)
+
+
+@functools.lru_cache(maxsize=8)
+def kh_khqr_print_image(image_base64, max_px=544):
+    """The shop's static KHQR image as printed: ``(png bytes, width / height, qr_found)``.
+
+    Converted to black and white, then cropped to the QR code found in it (:func:`kh_find_qr_box`)
+    or, when none is found, to its ink (an image of the square code itself with a white margin),
+    and resized for printing 18 mm wide. The white cell of the label around it is the quiet zone.
+    Cached: the same image prints on every COD label. Raises on an unreadable image.
+    """
+    image = Image.open(io.BytesIO(base64.b64decode(image_base64)))
+    image.load()
+    image = kh_to_black_and_white(image)
+    qr_box = kh_find_qr_box(image)
+    box = qr_box or Image.eval(image, lambda value: 255 - value).getbbox()
+    if box:
+        image = image.crop(box)
+    if max(image.size) > max_px:
+        image.thumbnail((max_px, max_px), Image.Resampling.NEAREST)
+    elif max(image.size) * 2 <= max_px:
+        factor = max_px // max(image.size)
+        image = image.resize((image.width * factor, image.height * factor), Image.Resampling.NEAREST)
+    output = io.BytesIO()
+    image.save(output, format='PNG')
+    return output.getvalue(), image.width / float(image.height or 1), bool(qr_box)
+
+
 class StockPicking(models.Model):
     _inherit = 'stock.picking'
 
@@ -251,6 +388,10 @@ class StockPicking(models.Model):
         help="Link encoded in the 'scan to pay' QR code of the COD label (Inventory > Settings > "
              "COD Delivery Label > Payment QR Code): the payment page of the sales order for the "
              "amount to collect, or the custom payment URL. Copy it to send it by Telegram or SMS.")
+    kh_pay_qr_warning = fields.Char(
+        string='Payment QR Warning', compute='_compute_kh_payment_link',
+        help="Why the Odoo payment link is not printed as the payment QR code of this COD label "
+             "(no payment provider the customer can pay with).")
     kh_receiver_phone = fields.Char(
         string='Receiver Phone', compute='_compute_kh_receiver_phone', store=True, readonly=False,
         help="Phone number(s) printed on the label, taken from the contact's phone, mobile or from "
@@ -336,11 +477,13 @@ class StockPicking(models.Model):
 
     @api.depends(
         'kh_cod_state', 'kh_cod_amount', 'kh_cod_currency_id', 'partner_id.name',
-        'sale_id.partner_invoice_id', 'company_id.kh_label_pay_qr', 'company_id.kh_label_pay_url_template')
+        'sale_id.partner_invoice_id', 'company_id.kh_label_pay_qr', 'company_id.kh_label_pay_url_template',
+        'company_id.kh_label_khqr_image')
     def _compute_kh_payment_link(self):
         for picking in self:
             mode, url = picking._kh_get_payment_url()
             picking.kh_payment_link = url if mode in ('odoo_link', 'custom_url') else False
+            picking.kh_pay_qr_warning = picking._kh_pay_qr_warning()
 
     @api.depends('partner_id', 'partner_id.name', 'partner_id.phone', 'partner_id.mobile',
                  'partner_id.commercial_partner_id.phone', 'partner_id.commercial_partner_id.mobile')
@@ -653,6 +796,46 @@ class StockPicking(models.Model):
         })
         return wizard.link or False
 
+    @api.model
+    def _kh_payment_providers(self, order, amount):
+        """Payment providers the customer can pay ``amount`` of ``order`` with on its payment page.
+
+        The providers the ``/payment/pay`` page of a sale payment link offers (same call as the
+        controller): enabled or in test mode, of the company of the order, compatible with the
+        country of its invoicing contact, its currency and the amount, and **published**: the
+        customer who scans the QR code is not an employee, Odoo hides unpublished providers from
+        them. Empty when every provider is disabled, e.g. on a database duplicated or restored with
+        "Neutralize" (``payment/data/neutralize.sql`` disables the enabled providers).
+        """
+        order = order.sudo()
+        providers = self.env['payment.provider'].sudo()._get_compatible_providers(
+            order.company_id.id, order.partner_invoice_id.id, amount, currency_id=order.currency_id.id,
+            sale_order_id=order.id)
+        return providers.filtered('is_published')
+
+    def _kh_pay_qr_warning(self):
+        """Why the Odoo payment link set up for the payment QR is not printed on this label, or False."""
+        self.ensure_one()
+        company = self.company_id or self.env.company
+        order = self.sudo().sale_id
+        if (company.kh_label_pay_qr != 'odoo_link' or not order or self.kh_cod_state != 'cod'
+                or not self._kh_is_cod_candidate()):
+            return False
+        currency = self.kh_cod_currency_id
+        amount = self._kh_round_cod(self.kh_cod_amount, currency)
+        if currency.compare_amounts(amount, 0.0) <= 0 or self._kh_payment_providers(order, amount):
+            return False
+        if company.kh_label_khqr_image:
+            printed = _("the label prints the static ABA KHQR image instead")
+        else:
+            printed = _("the label prints no payment QR code")
+        return _(
+            "No online payment provider is enabled (or in test mode) and published for %(company)s in "
+            "%(currency)s: the payment link would open a page where the customer cannot pay, so %(printed)s. "
+            "Enable one in Invoicing (or Website) > Configuration > Payment Providers. A database copy made "
+            "with 'Neutralize' has its providers disabled.",
+            company=order.company_id.name, currency=order.currency_id.name, printed=printed)
+
     def _kh_custom_payment_url(self, template, amount, currency):
         """Fill the custom payment URL ``template`` of the company.
 
@@ -700,7 +883,10 @@ class StockPicking(models.Model):
         company = self.company_id or self.env.company
         mode = company.kh_label_pay_qr
         if mode == 'odoo_link':
-            url = self._kh_odoo_payment_link(amount)
+            order = self.sudo().sale_id
+            # no QR code to a payment page where the customer cannot pay (e.g. providers disabled
+            # by the neutralization of a database copy): the static image, else no payment QR
+            url = order and self._kh_payment_providers(order, amount) and self._kh_odoo_payment_link(amount)
             if url:
                 return mode, url
             mode = 'khqr_image'
@@ -770,16 +956,33 @@ class StockPicking(models.Model):
     def _kh_clean_receiver_name(self, name):
         """Remove the phone numbers staff typed in the contact name ("Dara 095634706" -> "Dara").
 
-        Numbers typed with Khmer digits are removed too; other Khmer digits are kept as typed.
+        Numbers typed with Khmer digits are removed too; other Khmer digits are kept as typed. Only
+        what a removed number leaves behind is tidied: the separators next to it ("Dara - 0956..."),
+        brackets around it alone ("Dara (0956...)") or opened before it at the end of the name. A
+        name without phone number is kept as typed ("Dara (Toul Kork)").
         """
         name = re.sub(r'\s+', ' ', name or '').strip()
         ascii_name = kh_ascii_digits(name)  # same length: the match positions apply to ``name``
+        matches = list(PHONE_RE.finditer(ascii_name))
+        if not matches:
+            return name
         parts, start = [], 0
-        for match in PHONE_RE.finditer(ascii_name):
+        for match in matches:
             parts.append(name[start:match.start()])
             start = match.end()
         parts.append(name[start:])
-        cleaned = re.sub(r'\s+', ' ', ' '.join(parts)).strip(' ,;:-/|()')
+        cleaned = parts[0]
+        for part in parts[1:]:
+            # the text on each side of a removed number, without the separators typed next to it
+            left, right = cleaned.rstrip(NAME_SEPARATORS), part.lstrip(NAME_SEPARATORS)
+            if left.endswith('(') and right.startswith(')'):  # "(0956...)": brackets of the number alone
+                left, right = left[:-1].rstrip(NAME_SEPARATORS), right[1:].lstrip(NAME_SEPARATORS)
+            glue = ' ' if left and right and not left.endswith('(') and not right.startswith(')') else ''
+            cleaned = left + glue + right
+        cleaned = cleaned.strip(NAME_SEPARATORS)
+        # a bracket left open at the end (or closed at the start) by a removed number
+        while cleaned.endswith('(') or cleaned.startswith(')'):
+            cleaned = (cleaned[:-1] if cleaned.endswith('(') else cleaned[1:]).strip(NAME_SEPARATORS)
         return cleaned or name
 
     # ------------------------------------------------------------------
@@ -929,6 +1132,24 @@ class StockPicking(models.Model):
             return uri, image.width / float(image.height or 1)
         except Exception:  # noqa: BLE001 - SVG or unreadable image: print it as stored
             return image_data_uri(image_base64), 1.0
+
+    @api.model
+    def _kh_khqr_image(self, image_base64):
+        """Static KHQR image (base64) as printed: ``(data_uri, width / height, qr_found)``.
+
+        Black and white, cropped to the QR code found in the image (an uploaded ABA card keeps
+        only its code, which then prints 18 mm wide), else to its ink (see :func:`kh_khqr_print_image`).
+        An unreadable image (e.g. SVG) is printed as stored. ``(False, 1.0, False)`` without image.
+        """
+        if not image_base64:
+            return False, 1.0, False
+        if isinstance(image_base64, str):
+            image_base64 = image_base64.encode()
+        try:
+            png, ratio, found = kh_khqr_print_image(image_base64)
+        except Exception:  # noqa: BLE001 - SVG or unreadable image: print it as stored
+            return image_data_uri(image_base64), 1.0, False
+        return 'data:image/png;base64,%s' % base64.b64encode(png).decode(), ratio, found
 
     # ------------------------------------------------------------------
     # Label values
@@ -1102,8 +1323,8 @@ class StockPicking(models.Model):
             ``url`` is False for the static KHQR image. The QR codes are drawn without border: the
             white cell of the template is their quiet zone (1.6 mm, also next to the black COD
             box). Long URLs use the error correction level L, which keeps the modules large enough
-            for 203 dpi. The uploaded KHQR image is cropped to its ink and converted to black and
-            white, so the code itself prints 18 mm wide.
+            for 203 dpi. The uploaded KHQR image is cropped to the QR code found in it (else to its
+            ink) and converted to black and white, so the code itself prints 18 mm wide.
         """
         self.ensure_one()
         mode, url = self._kh_get_payment_url()
@@ -1112,7 +1333,7 @@ class StockPicking(models.Model):
         amount_str = self._kh_format_amount(self.kh_cod_amount, self.kh_cod_currency_id)
         image_style = 'width: 68px; height: 68px;'
         if mode == 'khqr_image':
-            image, ratio = self._kh_black_and_white_data_uri(company.kh_label_khqr_image, max_px=544, trim=True)
+            image, ratio, _found = self._kh_khqr_image(company.with_context(bin_size=False).kh_label_khqr_image)
             if ratio > 1:
                 image_style = 'width: 68px; height: %dpx;' % max(int(68 / ratio), 1)
             elif ratio < 1:
@@ -1312,9 +1533,11 @@ class StockPicking(models.Model):
     def _kh_items_values(self, company):
         """Items summary and note: their rows share the height of the items section.
 
-        The note has priority: one row when it fits, else two (all the rows when the items
-        summary is disabled); the items summary gets the rows left. Khmer texts get a taller line
-        pitch so their subscripts do not overprint the next row.
+        The items summary always keeps one row (at least "ទំនិញ Items (ចំនួន Qty N)": riders check
+        the quantity on "allow check" deliveries); the note gets the rest: up to two rows (all the
+        rows when the items summary is disabled), at 6 pt when that shows more of it, cut with an
+        ellipsis when it is longer. The items summary gets the rows the note leaves. Khmer texts
+        get a taller line pitch so their subscripts do not overprint the next row.
         """
         self.ensure_one()
         width = px_to_mm(LABEL_W - ITEMS_PAD_X - CHIPS_CELL_W)  # the "allow check" chip always prints
@@ -1322,38 +1545,52 @@ class StockPicking(models.Model):
         note = kh_truncate(self.kh_label_note, MAX_NOTE)
         # the bold Khmer prefix of the note / items summary ("ចំណាំ", "ទំនិញ") is on their first row
         note_script = 'khmer' if has_khmer(note) else 'prefixed'
-        note_rows = []
+        items_script = 'khmer' if has_khmer(' '.join(self.move_ids.product_id.mapped('name'))) else 'prefixed'
+        note_rows, note_size = [], NOTE_SIZES[0]
         room = ITEMS_H
         if note:
-            prefix_mm = text_width_mm(NOTE_PREFIX, NOTE_SIZE, bold=True)
-            if not show_items:
-                max_rows = next((lines for lines in (3, 2, 1)
-                                 if text_box(NOTE_SIZE, lines, note_script)[1] <= room), 1)
-            else:
-                max_rows = 2
-            note_rows, _truncated = wrap_lines(note, width, NOTE_SIZE, max_lines=max_rows, indent_mm=prefix_mm)
-            room -= text_box(NOTE_SIZE, len(note_rows), note_script)[1]
+            note_room = room - (text_box(ITEMS_SIZE, 1, items_script)[1] if show_items else 0)
+            best = None
+            for size in NOTE_SIZES:
+                max_rows = next((lines for lines in ((2, 1) if show_items else (3, 2, 1))
+                                 if text_box(size, lines, note_script)[1] <= note_room), 0)
+                if not max_rows:
+                    continue
+                rows, truncated = wrap_lines(note, width, size, max_lines=max_rows,
+                                             indent_mm=text_width_mm(NOTE_PREFIX, size, bold=True))
+                shown = count_units(' '.join(rows).rstrip('…'))
+                if best is None or shown > best[0]:
+                    best = (shown, rows, size)
+                if not truncated:
+                    break
+            if best:
+                _shown, note_rows, note_size = best
+                room -= text_box(note_size, len(note_rows), note_script)[1]
         items_rows, items_more, total_qty = [], 0, '0'
         items_lines = 0
-        items_script = 'khmer' if has_khmer(' '.join(self.move_ids.product_id.mapped('name'))) else 'prefixed'
         if show_items:
             items_lines = next((lines for lines in (3, 2, 1)
                                 if text_box(ITEMS_SIZE, lines, items_script)[1] <= room), 0)
             if items_lines:
                 items_rows, items_more, total_qty = self._kh_label_items_rows(
                     company.kh_label_max_item_lines, width_mm=width, lines=items_lines)
+        # "+2 more" after the last product, without a second ellipsis after a cut name / row
+        more_text = ''
+        if items_rows and items_more:
+            more_text = '%s+%s more' % ('' if items_rows[-1].endswith('…') else '… ', items_more)
         return {
             'show_items': show_items,
             'items': ' '.join(items_rows),
             'items_rows': items_rows,
             'items_more': items_more,
+            'items_more_text': more_text,
             'total_qty': total_qty,
             'items_lines': items_lines,
             'items_style': box_style(ITEMS_SIZE, max(len(items_rows), 1), items_script, max_height=True),
             'note': ' '.join(note_rows),
             'note_rows': note_rows,
             'note_lines': len(note_rows),
-            'note_style': box_style(NOTE_SIZE, max(len(note_rows), 1), note_script, max_height=True),
+            'note_style': box_style(note_size, max(len(note_rows), 1), note_script, max_height=True),
         }
 
     def _kh_footer_values(self, company):

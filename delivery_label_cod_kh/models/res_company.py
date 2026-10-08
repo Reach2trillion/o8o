@@ -59,14 +59,16 @@ class ResCompany(models.Model):
     kh_label_khqr_image = fields.Image(
         string='ABA KHQR Image', max_width=512, max_height=512,
         help="Static ABA KHQR payment QR code of the shop. Printed as the payment QR of COD labels "
-             "in 'Static ABA KHQR image' mode, and as fallback of the Odoo payment link for "
-             "transfers without sales order.")
+             "in 'Static ABA KHQR image' mode, and as fallback of the Odoo payment link (transfers "
+             "without sales order, no payment provider). The QR code is found in the image, so the "
+             "whole ABA KHQR card can be uploaded.")
     kh_label_pay_qr = fields.Selection(
         PAY_QR_MODES, string='Payment QR Code', default='odoo_link', required=True,
         help="'Scan to pay' QR code printed next to the amount on COD labels only:\n"
              "- Odoo payment link: opens the payment page of the sales order with the COD amount "
-             "(pay with any published payment provider, e.g. ABA KHQR). Transfers without sales order "
-             "use the static KHQR image instead, when one is set.\n"
+             "(pay with any published payment provider, e.g. ABA KHQR). Transfers without sales order, "
+             "and orders no payment provider can be used for (none enabled or in test mode and "
+             "published), use the static KHQR image instead, when one is set.\n"
              "- Static ABA KHQR image: the uploaded image; the customer types the amount.\n"
              "- Custom URL: the URL template below.\n"
              "- No payment QR.")
@@ -104,6 +106,19 @@ class ResCompany(models.Model):
         string='Allow Check by Default', default=True,
         help="Default value of the 'Allow to check goods' flag of new delivery orders "
              "(the customer may open the parcel before paying).")
+
+    def _kh_has_payment_provider(self):
+        """True when a customer can pay online for this company: a payment provider is enabled or in
+        test mode and published (Odoo shows only published providers to customers). The labels also
+        check the currency, country and amount of each order (``stock.picking._kh_payment_providers``).
+        """
+        self.ensure_one()
+        Provider = self.env['payment.provider'].sudo()
+        return bool(Provider.search_count([
+            *Provider._check_company_domain(self),
+            ('state', 'in', ('enabled', 'test')),
+            ('is_published', '=', True),
+        ], limit=1))
 
     # ------------------------------------------------------------------
     # Riel conversion helpers

@@ -55,6 +55,10 @@
                                 the public address of your Odoo. Transfers without sales order print the static
                                 KHQR image below when it is set.
                             </div>
+                            <div class="alert alert-warning mt8 mb-0" role="alert"
+                                 invisible="kh_label_pay_qr != 'odoo_link' or not kh_label_pay_provider_warning">
+                                <field name="kh_label_pay_provider_warning" class="d-inline" readonly="1"/>
+                            </div>
                             <div class="mt8" invisible="kh_label_pay_qr != 'odoo_link'">
                                 <button name="%(payment.action_payment_provider)d" type="action" icon="oi-arrow-right"
                                         string="Payment Providers" class="btn-link"/>
@@ -71,9 +75,12 @@
                                 <label for="kh_label_khqr_image" class="col-lg-5 o_light_label"/>
                                 <field name="kh_label_khqr_image" widget="image" class="col-lg-3" options="{'size': [96, 96]}"/>
                                 <div class="text-muted small mt4" invisible="kh_label_pay_qr != 'khqr_image'">
-                                    Upload the QR code of the shop (ideally the square code itself, cropped from the ABA
-                                    card): it is cropped to its ink and printed 18 mm wide, and the customer types the
-                                    amount shown next to it.
+                                    Upload the QR code of the shop (the square code itself, or the ABA KHQR card: the
+                                    code is found in it): it is printed 18 mm wide in black and white, and the customer
+                                    types the amount shown next to it.
+                                </div>
+                                <div class="alert alert-warning mt8 mb-0" role="alert" invisible="not kh_label_khqr_image_warning">
+                                    <field name="kh_label_khqr_image_warning" class="d-inline" readonly="1"/>
                                 </div>
                             </div>
                         </div>

@@ -4,7 +4,8 @@
 Every test class inherits :class:`CodLabelCommon`, based on ``AccountTestInvoicingCommon``: an
 independent USD company with a chart of accounts and a warehouse, located in Cambodia, the KHR
 currency active at 4061.32 riel per dollar, two goods products without taxes, a "Delivery"
-carrier ($2 fixed price) and a Cambodian customer in the province "ខេត្តកណ្តាល".
+carrier ($2 fixed price), a Cambodian customer in the province "ខេត្តកណ្តាល" and a published
+payment provider in test mode (the payment QR needs one).
 
 The standard order of the tests is $15.00 of goods + $2.00 of delivery = $17.00.
 """
@@ -101,6 +102,16 @@ class CodLabelCommon(AccountTestInvoicingCommon):
             'partner_longitude': 104.9500127,
         })
         cls.messy_customer = Partner.create({'name': 'Andyyvathhh 095634706'})
+
+        # --- an online payment provider the customer can pay with (the shop's "ABA KHQR") ----------
+        # The "scan to pay" QR code is printed only when the payment page offers a provider:
+        # enabled or in test mode, and published (customers do not see unpublished providers).
+        payment_method = cls.env.ref('payment.payment_method_unknown')
+        cls.provider = cls.env['payment.provider'].create({
+            'name': 'Dummy (test)', 'code': 'none', 'state': 'test', 'is_published': True,
+            'company_id': cls.company.id, 'payment_method_ids': [Command.set(payment_method.ids)],
+        })
+        payment_method.active = True
 
         cls.warehouse = cls.env['stock.warehouse'].search([('company_id', '=', cls.company.id)], limit=1)
         cls.picking_type_out = cls.warehouse.out_type_id
