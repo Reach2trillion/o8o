@@ -2,7 +2,7 @@
 {
     'name': 'Cambodia COD Delivery Label (100x80)',
     'summary': 'High-contrast 100 x 80 mm delivery label for Cambodian Cash-on-Delivery couriers '
-               '(amount to collect in USD and KHR, receiver phone, province, QR, barcode)',
+               '(amount to collect in USD and KHR, scan-to-pay QR, receiver phone, province, barcode)',
     'description': """
 Cambodia COD Delivery Label (100 x 80 mm)
 =========================================
@@ -16,8 +16,11 @@ Cambodian Cash-on-Delivery (COD) couriers. Bilingual Khmer / English, black on w
 * Receiver name, callable phone (also extracted from the contact name when staff typed it
   there), address and province box; sender, courier, parcel x/N and weight.
 * Items summary, "allow check" / "fragile" handling chips and a free note.
-* QR code (Google Maps location of the receiver, transfer reference or the shop's ABA KHQR)
-  and a Code128 barcode of the transfer reference for the Barcode app.
+* "Scan to pay" QR code next to the amount on COD labels: the Odoo payment page of the sales
+  order for the amount to collect (pay with ABA KHQR or any published provider), the shop's
+  static ABA KHQR image or a custom URL. The link is also on the transfer, ready to copy.
+* Information QR code (Google Maps location of the receiver or transfer reference) and a
+  Code128 barcode of the transfer reference for the Barcode app.
 * One label per parcel, one 100 x 80 mm page per label.
 """,
     'version': '18.0.1.0.0',

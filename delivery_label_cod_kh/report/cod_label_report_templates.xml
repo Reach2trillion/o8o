@@ -20,7 +20,7 @@
 
          Vertical budget (inner height 76.2 mm = 77 mm - 2 x 0.4 mm border), each section height
          includes its 0.3 mm bottom rule:
-           header 11 | receiver 25.7 | payment 21.7 | items 9.8 | footer 8
+           header 11 | receiver 25.7 | payment 22.1 | items 9.6 | footer 7.8
          ================================================================ -->
 
     <template id="report_cod_label_style">
@@ -67,11 +67,17 @@
                 background: transparent;
                 font-size: inherit;
             }
+            /* Bootstrap (report CSS bundle) gives table rows / sections "border-style: solid;
+               border-width: 0": in the collapsed border model wkhtmltopdf draws them as grey
+               hairlines, so they are reset here (cell borders are only set by .o_kh_sep). */
+            .o_kh_label table, .o_kh_label thead, .o_kh_label tbody, .o_kh_label tfoot, .o_kh_label tr {
+                border: 0 none !important;
+            }
             .o_kh_label td {
                 padding: 0;
                 vertical-align: top;
                 overflow: hidden;
-                border: 0;
+                border: 0 none;
             }
             .o_kh_label img { display: block; border: 0; }
             .o_kh_nowrap { white-space: nowrap; overflow: hidden; }
@@ -87,12 +93,12 @@
             .o_kh_sec_head table.o_kh_cols { height: 10.7mm; }
             .o_kh_sec_recv { height: 25.7mm; }
             .o_kh_sec_recv table.o_kh_cols { height: 25.4mm; }
-            .o_kh_sec_pay { height: 21.7mm; }
-            .o_kh_sec_pay table.o_kh_cols { height: 21.4mm; }
-            .o_kh_sec_items { height: 9.8mm; }
-            .o_kh_sec_items table.o_kh_cols { height: 9.5mm; }
-            .o_kh_sec_foot { height: 8mm; border-bottom: 0; }
-            .o_kh_sec_foot table.o_kh_cols { height: 8mm; }
+            .o_kh_sec_pay { height: 22.1mm; }
+            .o_kh_sec_pay table.o_kh_cols { height: 21.8mm; }
+            .o_kh_sec_items { height: 9.6mm; }
+            .o_kh_sec_items table.o_kh_cols { height: 9.3mm; }
+            .o_kh_sec_foot { height: 7.8mm; border-bottom: 0; }
+            .o_kh_sec_foot table.o_kh_cols { height: 7.8mm; }
 
             /* 1. header */
             .o_kh_logo_cell { width: 11mm; }
@@ -148,27 +154,35 @@
             .o_kh_none_box table { height: 18mm; }
             .o_kh_none_title { font-size: 12pt; font-weight: bold; line-height: 1.3; white-space: nowrap; }
             .o_kh_none_sub { font-size: 7pt; line-height: 1.3; white-space: nowrap; }
-            .o_kh_qr_cell { width: 25mm; padding: 1.5mm 1.5mm 0 1.5mm !important; text-align: center; }
-            .o_kh_qr_cell .o_kh_qr { width: 16mm; height: 16mm; margin: 0 auto; }
-            .o_kh_qr_caption { font-size: 6pt; line-height: 1.25; white-space: nowrap; overflow: hidden; text-align: center; padding-top: 0.3mm; }
-            /* payment QR: the white cell is the quiet zone (1.7 mm on every side, also next to the
-               black COD box); 18 mm code + 2 x 1.7 mm = the 21.4 mm height of the section */
-            .o_kh_payqr_cell { width: 21.4mm; padding: 1.7mm !important; background: #fff !important; text-align: center; vertical-align: middle !important; }
+            /* info QR of PAID / NO COD labels: 0.8 mm + 15 mm code + 0.5 mm + two 6 pt caption lines fit the 21.8 mm section */
+            .o_kh_qr_cell { width: 25mm; padding: 0.8mm 1.5mm 0 1.5mm !important; text-align: center; }
+            .o_kh_qr_cell .o_kh_qr { width: 15mm; height: 15mm; margin: 0 auto; }
+            .o_kh_qr_caption { font-size: 6pt; line-height: 1.25; white-space: nowrap; overflow: hidden; text-align: center; padding-top: 0.5mm; }
+            /* payment QR: the white cell is the quiet zone, also next to the black COD box. The 18 mm
+               code is centred without padding (wkhtmltopdf rounds paddings to whole CSS pixels):
+               ~2 mm left / right in the 22 mm cell, ~1.9 mm above / below in the 21.8 mm section */
+            .o_kh_payqr_cell { width: 22mm; padding: 0 !important; background: #fff !important; text-align: center; vertical-align: middle !important; }
             .o_kh_payqr { width: 18mm; height: 18mm; margin: 0 auto; }
             .o_kh_payqr_img { max-width: 18mm; max-height: 18mm; margin: 0 auto; }
 
             /* 4. items and instructions */
-            .o_kh_items_cell { padding: 0.5mm 1.6mm 0 1.6mm !important; }
-            .o_kh_items { font-size: 6.5pt; line-height: 1.25; max-height: 8.2mm; overflow: hidden; }
-            .o_kh_items_2 { max-height: 5.5mm; }
-            .o_kh_note { font-size: 7pt; line-height: 1.3; max-height: 8.6mm; overflow: hidden; }
-            .o_kh_note_1 { height: 3.1mm; white-space: nowrap; }
+            /* the items summary and the note share 3 lines; Python decides how many each gets
+               (items_lines / note_lines) and fits the texts to them */
+            .o_kh_items_cell { padding: 0.3mm 1.6mm 0 1.6mm !important; }
+            .o_kh_items { font-size: 6.5pt; line-height: 1.25; overflow: hidden; }
+            .o_kh_items.o_kh_lines_1 { max-height: 2.9mm; white-space: nowrap; }
+            .o_kh_items.o_kh_lines_2 { max-height: 5.8mm; }
+            .o_kh_items.o_kh_lines_3 { max-height: 8.7mm; }
+            .o_kh_note { font-size: 7pt; line-height: 1.2; overflow: hidden; }
+            .o_kh_note.o_kh_lines_1 { max-height: 3mm; white-space: nowrap; }
+            .o_kh_note.o_kh_lines_2 { max-height: 6mm; }
+            .o_kh_note.o_kh_lines_3 { max-height: 9mm; }
             .o_kh_chips_cell { width: 40mm; padding: 0.6mm 1.2mm 0 0 !important; }
             .o_kh_chip { border: 0.3mm solid #000; font-size: 6pt; font-weight: bold; line-height: 1.3; height: 3.8mm; padding: 0.3mm 0.8mm 0 0.8mm; margin-bottom: 0.5mm; white-space: nowrap; overflow: hidden; }
             .o_kh_chip_inv { background: #000 !important; color: #fff !important; }
 
             /* 5. footer */
-            .o_kh_barcode_cell { width: 52mm; padding: 0.6mm 2.8mm 0 2.8mm !important; }
+            .o_kh_barcode_cell { width: 52mm; padding: 0.5mm 2.8mm 0 2.8mm !important; }
             .o_kh_barcode { width: 46mm; height: 4.6mm; }
             .o_kh_barcode_text { font-size: 6pt; font-weight: bold; line-height: 1.2; letter-spacing: 0.25mm; text-align: center; white-space: nowrap; overflow: hidden; }
             .o_kh_footer_text { font-size: 6pt; line-height: 1.3; max-height: 7.4mm; overflow: hidden; text-align: center; }
@@ -314,12 +328,15 @@
         <div class="o_kh_sec o_kh_sec_items">
             <table class="o_kh_cols"><tr>
                 <td class="o_kh_items_cell">
-                    <div t-if="label['show_items'] and label['items']"
-                         t-attf-class="o_kh_items #{'o_kh_items_2' if label['note'] else ''}">
+                    <div t-if="label['items_lines'] and (label['items'] or label['items_more'])"
+                         t-attf-class="o_kh_items o_kh_lines_#{label['items_lines']}">
                         <b>ទំនិញ Items (ចំនួន Qty <t t-out="label['total_qty']"/>):</b>
-                        <t t-out="label['items']"/><b t-if="label['items_more']"> … +<t t-out="label['items_more']"/> more</b>
+                        <t t-if="label['items']">
+                            <t t-out="label['items']"/><b t-if="label['items_more']"> … +<t t-out="label['items_more']"/> more</b>
+                        </t>
+                        <t t-else=""><t t-out="label['items_more']"/> មុខ products</t>
                     </div>
-                    <div t-if="label['note']" t-attf-class="o_kh_note #{'o_kh_note_1' if label['show_items'] and label['items'] else ''}">
+                    <div t-if="label['note']" t-attf-class="o_kh_note o_kh_lines_#{label['note_lines']}">
                         <b>ចំណាំ Note:</b> <t t-out="label['note']"/>
                     </div>
                 </td>

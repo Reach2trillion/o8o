@@ -3,7 +3,7 @@ import io
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests.common import tagged
+from odoo.tests.common import HttpCase, tagged
 from odoo.tools.pdf import PdfFileReader
 
 from odoo.addons.delivery_label_cod_kh.models.kh_label_text import fit_width, text_width_mm, truncate
@@ -304,7 +304,8 @@ class TestReceiverPhone(CodLabelCommon):
 
     def test_commercial_partner_fallback(self):
         company = self.env['res.partner'].create({'name': 'Shop', 'is_company': True, 'mobile': '010 222 333'})
-        contact = self.env['res.partner'].create({'name': 'Delivery point', 'parent_id': company.id, 'type': 'delivery'})
+        contact = self.env['res.partner'].create({
+            'name': 'Delivery point', 'parent_id': company.id, 'type': 'delivery'})
         self.assertEqual(self.env['stock.picking']._kh_extract_phones(contact), '010 222 333')
 
     def test_stored_and_editable(self):
@@ -397,18 +398,51 @@ class TestLabelValues(CodLabelCommon):
 
     def test_items_hidden(self):
         self.company.kh_label_show_items = False
-        label = self._labels(self._deliveries(self._create_order()))[0]
+        picking = self._deliveries(self._create_order())
+        label = self._labels(picking)[0]
         self.assertFalse(label['items'])
+        self.assertEqual(label['items_lines'], 0)
+        picking.kh_label_note = 'Call before 5pm'
+        self.assertEqual(self._labels(picking)[0]['note_lines'], 3, "the note gets the whole items area")
+
+    def test_items_line_kept_next_to_long_note(self):
+        """A 2-line note leaves one line to the items: the quantity and number of products stay."""
+        products = [
+            self.env['product.product'].create({
+                'name': 'Very Long Product Name Number %s For The Label' % i, 'type': 'consu'})
+            for i in range(6)
+        ]
+        picking = self._deliveries(self._create_order(lines=[(product, 2, 1.0) for product in products]))
+        picking.write({
+            'kh_fragile': True,
+            'kh_label_note': 'Call 30 min before arrival, deliver after 5pm only, leave at the pharmacy next door',
+        })
+        label = self._labels(picking)[0]
+        self.assertEqual((label['note_lines'], label['items_lines']), (2, 1))
+        self.assertEqual(label['total_qty'], '12')
+        self.assertEqual(label['items_more'] + len(label['items'].split('× ')) - 1, 6)
+        html = self.env['ir.actions.report']._render_qweb_html(REPORT, picking.ids)[0].decode()
+        self.assertIn('ចំនួន Qty 12', html)
+        self.assertIn('o_kh_items o_kh_lines_1', html)
+        self.assertIn('o_kh_note o_kh_lines_2', html)
+        if not label['items']:
+            self.assertIn('6 មុខ products', html)
 
     def test_qr(self):
         picking = self._deliveries(self._create_order())
         label = self._labels(picking)[0]
-        qr = label.get('info_qr', label.get('qr'))
-        self.assertTrue(qr and qr.startswith('data:image/png;base64,'), "map QR from the geolocation")
+        self.assertTrue(label['info_qr'].startswith('data:image/png;base64,'), "map QR from the geolocation")
+        self.assertEqual(label['info_qr_kind'], 'map')
         self.assertTrue(label['barcode'].startswith('data:image/png;base64,'))
+        # PAID label: the map QR stays in the payment section with its long caption
+        picking.kh_payment_mode = 'paid'
+        label = self._labels(picking)[0]
+        self.assertEqual(label['info_qr_place'], 'payment')
+        self.assertEqual(label['info_qr_caption_lines'], ('ស្កេនមើលទីតាំង', 'Scan for map'))
         self.company.kh_label_qr_content = 'none'
         label = self._labels(picking)[0]
-        self.assertFalse(label.get('info_qr', label.get('qr')))
+        self.assertFalse(label['info_qr'])
+        self.assertFalse(label['info_qr_place'])
 
     def test_handling_defaults(self):
         picking = self._deliveries(self._create_order())
@@ -434,7 +468,10 @@ class TestLabelText(CodLabelCommon):
             cut = truncate(text, limit)
             self.assertTrue(cut.endswith('…'))
             self.assertLessEqual(len(cut), limit)
-            self.assertNotEqual(cut[-2], '្', cut)
+            if len(cut) > 1:  # a bare ellipsis when not even one syllable fits
+                self.assertNotEqual(cut[-2], '្', cut)
+        self.assertEqual(truncate(text, 2), '…')
+        self.assertEqual(truncate(text, 3), 'ខេ…', "a consonant keeps its vowel sign")
 
     def test_khmer_is_wider_than_latin(self):
         self.assertGreater(text_width_mm('ខេត្តកណ្តាល', 10), text_width_mm('Kandal Pro', 10))
@@ -469,10 +506,18 @@ class TestCodLabelReport(CodLabelCommon):
                      'Total for 2 parcels'):
             self.assertIn(text, html)
 
+
+@tagged('post_install', '-at_install')
+class TestCodLabelPdf(CodLabelCommon, HttpCase):
+    """Real PDF rendering. An HttpCase, so that wkhtmltopdf loads the report CSS bundle from the
+    running test server (``web.base.url`` points to it) like in production."""
+
     def test_pdf_pages(self):
         """Real PDF: one 100 x 80 mm page per label, no blank page."""
         if self.env['ir.actions.report'].get_wkhtmltopdf_state() != 'ok':
             self.skipTest("wkhtmltopdf is not available")
+        # wkhtmltopdf fetches the CSS bundle from report.url (when set) or web.base.url
+        self.env['ir.config_parameter'].sudo().set_param('report.url', self.base_url())
         first = self._deliveries(self._create_order())
         second = self._deliveries(self._create_order(partner=self.messy_customer))
         second.kh_parcel_count = 3

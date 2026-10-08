@@ -69,7 +69,7 @@ INFO_QR_CELL = 18.5     # info QR cell of the receiver section (when the payment
 PROVINCE_CELL_SHRINK = 3.5  # the province box is narrower when the info QR sits next to it
 W_PROVINCE = 23.0       # inside the province box
 W_PAYMENT = 67.0        # COD box next to the info QR code
-W_PAYMENT_PAYQR = 70.5  # COD box next to the payment QR code
+W_PAYMENT_PAYQR = 70.0  # COD box next to the payment QR code
 W_PAYMENT_FULL = 92.0   # COD box without QR code
 W_ITEMS = 52.5          # items / note column next to the handling chips
 W_ITEMS_FULL = 93.0     # items / note column without chips
@@ -81,7 +81,7 @@ AMOUNT_SIZES = (25, 22, 19, 16)
 AMOUNT_MAX_SIZE_MULTI_PARCEL = 21  # leaves room for the "total for N parcels" line
 # Height (mm) of the COD box: title line + amount line + optional small lines (fee breakdown,
 # "total for N parcels", "scan to pay" caption). The amount size is capped so everything fits.
-PAY_BOX_HEIGHT = 21.4 - 1.2  # section height minus the vertical padding of the black box
+PAY_BOX_HEIGHT = 21.8 - 1.2  # section height minus the vertical padding of the black box
 PAY_TITLE_HEIGHT = 3.7
 PAY_SMALL_LINE_HEIGHT = 3.05
 AMOUNT_LINE_HEIGHT = 1.05 * 25.4 / 72.0  # mm per pt of the amount font (line-height 1.05)
@@ -99,7 +99,7 @@ PROVINCE_PREFIXES = ('រាជធានី', 'ខេត្ត', 'ក្រុ�
 # Payment QR ("scan to pay") of COD labels, see the README.
 PAY_CAPTION = 'ស្កេនដើម្បីទូទាត់ · SCAN TO PAY'
 PAY_CAPTION_KHQR = 'ABA KHQR · ស្កេនដើម្បីទូទាត់ · SCAN TO PAY'
-PAY_QR_PIXELS = 660            # rendered size of the payment QR PNG (printed 18.4 mm wide)
+PAY_QR_PIXELS = 660            # size of the payment QR PNG drawn by reportlab (printed 18 mm wide)
 PAY_QR_LEVEL_M_MAX_BYTES = 106  # QR version 6 at level M; longer URLs use level L (less dense)
 INFO_QR_PIXELS = 360
 MAP_CAPTION_LINES = ('ស្កេនមើលទីតាំង', 'Scan for map')
@@ -733,7 +733,7 @@ class StockPicking(models.Model):
 
         :return: ``{'mode', 'url', 'image', 'caption', 'amount_str'}`` or False. ``url`` is False
             for the static KHQR image. The QR codes are drawn without border: the white cell of the
-            template is their quiet zone (>= 1.6 mm, also next to the black COD box). Long URLs use
+            template is their quiet zone (about 2 mm, also next to the black COD box). Long URLs use
             the error correction level L, which keeps the modules large enough for 203 dpi.
         """
         self.ensure_one()
@@ -763,15 +763,19 @@ class StockPicking(models.Model):
 
     def _kh_info_qr_place(self, info_qr, pay_qr):
         """Where the information QR prints: ``'payment'`` (QR slot of the payment section),
-        ``'receiver'`` (next to the province, when the payment QR takes the slot) or False.
+        ``'receiver'`` (next to the province box) or False (omitted).
 
-        Hook: return False when ``pay_qr`` is set to omit the information QR on COD labels with a
-        payment QR (the payment QR always wins the space).
+        The payment QR always wins the QR slot of the payment section. On such COD labels the map
+        QR moves to the receiver section (the receiver texts get a narrower column), while a
+        reference QR is omitted: the Code128 barcode of the footer carries the same reference, and
+        the receiver name / address keep their full width. Override to change the rule.
         """
         self.ensure_one()
         if not info_qr:
             return False
-        return 'receiver' if pay_qr else 'payment'
+        if not pay_qr:
+            return 'payment'
+        return 'receiver' if info_qr['kind'] == 'map' else False
 
     @api.model
     def _kh_split_province(self, province):
@@ -860,8 +864,8 @@ class StockPicking(models.Model):
             }
         company_values = cache[company.id]
 
-        # QR codes: the payment QR (COD labels only) takes the QR slot of the payment section,
-        # the information QR (map / reference) then moves to the receiver section.
+        # QR codes: the payment QR (COD labels only) takes the QR slot of the payment section; the
+        # information QR then moves to the receiver section (map) or is omitted (reference).
         pay_qr = self._kh_label_pay_qr(company)
         info_qr = self._kh_label_info_qr(company)
         info_place = self._kh_info_qr_place(info_qr, pay_qr)
@@ -896,7 +900,7 @@ class StockPicking(models.Model):
             else:
                 note_lines = 2
             note = fit_width(NOTE_PREFIX + note, items_width, NOTE_SIZE, bold=True, lines=note_lines)
-            note = note[len(NOTE_PREFIX):] if note.startswith(NOTE_PREFIX) else note
+            note = note.removeprefix(NOTE_PREFIX)
         items, items_more, total_qty = ('', 0, '0')
         items_lines = ITEMS_TEXT_LINES - note_lines if show_items else 0
         if items_lines:
@@ -960,6 +964,10 @@ class StockPicking(models.Model):
     # Actions
     # ------------------------------------------------------------------
     def action_print_cod_label(self):
-        """Print the 100 x 80 mm COD label(s) of the selected transfers."""
+        """Print the 100 x 80 mm COD label(s) of the selected transfers.
+
+        ``config=False``: the label has its own header and does not use the company document
+        layout, so administrators are never sent to the document layout configurator first.
+        """
         self._kh_check_cod_ambiguity()
-        return self.env.ref('delivery_label_cod_kh.action_report_cod_label').report_action(self)
+        return self.env.ref('delivery_label_cod_kh.action_report_cod_label').report_action(self, config=False)
