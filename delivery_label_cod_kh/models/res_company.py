@@ -10,8 +10,14 @@ KHR_RATE_SOURCES = [
 QR_CONTENTS = [
     ('map', "Receiver location (Google Maps)"),
     ('reference', 'Transfer reference'),
-    ('khqr', 'Shop ABA KHQR (when collecting COD)'),
     ('none', 'Nothing'),
+]
+
+PAY_QR_MODES = [
+    ('odoo_link', 'Odoo payment link of the sales order'),
+    ('khqr_image', 'Static ABA KHQR image'),
+    ('custom_url', 'Custom URL'),
+    ('none', 'No payment QR'),
 ]
 
 DEFAULT_KHR_RATE = 4100.0
@@ -38,18 +44,32 @@ class ResCompany(models.Model):
         string='Print Riel Equivalent', default=True,
         help="Print the riel equivalent of the amount to collect (or the USD equivalent for orders in riel).")
     kh_label_qr_content = fields.Selection(
-        QR_CONTENTS, string='Label QR Code', default='map', required=True,
-        help="What the QR code of the COD label contains:\n"
+        QR_CONTENTS, string='Label Info QR Code', default='map', required=True,
+        help="What the information QR code of the label contains:\n"
              "- Receiver location: Google Maps link built from the contact's geolocation "
              "(falls back to the transfer reference when the contact has no coordinates).\n"
              "- Transfer reference: the reference of the transfer.\n"
-             "- Shop ABA KHQR: the static KHQR image below, only when money must be collected "
-             "(falls back to the transfer reference).\n"
-             "- Nothing: no QR code.")
+             "- Nothing: no information QR code.")
     kh_label_khqr_image = fields.Image(
         string='ABA KHQR Image', max_width=512, max_height=512,
-        help="Static ABA KHQR payment QR code of the shop, printed on COD labels when "
-             "'Shop ABA KHQR' is selected.")
+        help="Static ABA KHQR payment QR code of the shop. Printed as the payment QR of COD labels "
+             "in 'Static ABA KHQR image' mode, and as fallback of the Odoo payment link for "
+             "transfers without sales order.")
+    kh_label_pay_qr = fields.Selection(
+        PAY_QR_MODES, string='Payment QR Code', default='odoo_link', required=True,
+        help="'Scan to pay' QR code printed next to the amount on COD labels only:\n"
+             "- Odoo payment link: opens the payment page of the sales order with the COD amount "
+             "(pay with any published payment provider, e.g. ABA KHQR). Transfers without sales order "
+             "use the static KHQR image instead, when one is set.\n"
+             "- Static ABA KHQR image: the uploaded image; the customer types the amount.\n"
+             "- Custom URL: the URL template below.\n"
+             "- No payment QR.")
+    kh_label_pay_url_template = fields.Char(
+        string='Payment URL Template',
+        help="URL encoded in the payment QR in 'Custom URL' mode. Placeholders (URL-encoded): "
+             "{order} sales order reference, {picking} transfer reference, {amount} amount to collect, "
+             "{currency} currency code (USD, KHR), {partner} receiver name. "
+             "Example: https://pay.example.com/?ref={order}&amount={amount}&ccy={currency}")
     kh_label_show_items = fields.Boolean(
         string='Print Item Summary', default=True,
         help="Print the list of products on the label. Disable it for discreet parcels.")

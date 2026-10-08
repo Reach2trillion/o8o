@@ -61,22 +61,25 @@ PHONE_SPLIT_RE = re.compile(r'\s*[/,;|]\s*')
 MAP_URL = 'https://maps.google.com/?q=%.7f,%.7f'
 
 # Usable text widths (mm) of the label boxes and font sizes (pt), mirrored from the template CSS.
-W_RECEIVER = 64.5       # receiver column next to the province box
-W_RECEIVER_FULL = 92.0  # receiver column when there is no province
-W_PROVINCE = 22.5       # inside the province box
-W_PAYMENT = 65.5        # COD box next to the QR code
-W_PAYMENT_FULL = 91.0   # COD box without QR code
-W_ITEMS = 52.0          # items / note column next to the handling chips
-W_ITEMS_FULL = 92.0     # items / note column without chips
+W_RECEIVER = 65.5       # receiver column next to the province box
+W_RECEIVER_FULL = 93.0  # receiver column when there is no province
+W_PROVINCE = 23.0       # inside the province box
+W_PAYMENT = 67.0        # COD box next to the QR code
+W_PAYMENT_FULL = 92.0   # COD box without QR code
+W_ITEMS = 52.5          # items / note column next to the handling chips
+W_ITEMS_FULL = 93.0     # items / note column without chips
 NAME_SIZES = (13, 11, 9)
 PHONE_SIZES = (18, 16, 14, 12)
 PHONE2_SIZE = 10
 AMOUNT_SIZES = (25, 22, 19, 16)
+AMOUNT_MAX_SIZE_MULTI_PARCEL = 21  # leaves room for the "total for N parcels" line
 SECONDARY_SIZE = 12
-PROVINCE_SIZES = (13, 11.5, 10)
+PROVINCE_SIZES = (15, 13, 11.5, 10)
 ADDRESS_SIZE = 8
 ITEMS_SIZE = 6.5
 NOTE_SIZE = 7
+ITEMS_TEXT_LINES = 3    # lines shared by the items summary and the note
+NOTE_PREFIX = 'ចំណាំ Note: '
 PROVINCE_PREFIXES = ('រាជធានី', 'ខេត្ត', 'ក្រុង')
 
 
@@ -394,18 +397,29 @@ class StockPicking(models.Model):
             _logger.warning("Cannot render %s barcode for %r on the COD label", barcode_type, value)
             return False
         except RenderPMError:
-            png = self._kh_barcode_png_fallback(barcode_type, value)
+            png = self._kh_barcode_png_fallback(barcode_type, value, **kwargs)
             if not png:
                 return False
         return 'data:image/png;base64,%s' % base64.b64encode(png).decode()
 
     @api.model
-    def _kh_barcode_png_fallback(self, barcode_type, value):
-        """Pixel-exact PNG of a Code128 barcode or a QR code drawn with PIL (no reportlab bitmap backend)."""
+    def _kh_barcode_png_fallback(self, barcode_type, value, **kwargs):
+        """Pixel-exact PNG of a Code128 barcode or a QR code drawn with PIL (no reportlab bitmap backend).
+
+        Honours the ``quiet`` / ``barBorder`` / ``barLevel`` options of ``ir.actions.report.barcode()``
+        for QR codes (``quiet`` truthy means no border, like the standard method).
+        """
         try:
             if barcode_type == 'QR':
                 import qrcode  # noqa: PLC0415 - optional, only needed for the fallback
-                qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=12, border=2)
+                levels = {
+                    'L': qrcode.constants.ERROR_CORRECT_L, 'M': qrcode.constants.ERROR_CORRECT_M,
+                    'Q': qrcode.constants.ERROR_CORRECT_Q, 'H': qrcode.constants.ERROR_CORRECT_H,
+                }
+                border = 0 if int(kwargs.get('quiet', 1)) else int(kwargs.get('barBorder', 4))
+                qr = qrcode.QRCode(
+                    error_correction=levels.get(kwargs.get('barLevel', 'L'), qrcode.constants.ERROR_CORRECT_L),
+                    box_size=12, border=border)
                 qr.add_data(value)
                 qr.make(fit=True)
                 image = qr.make_image(fill_color='black', back_color='white').get_image()
@@ -518,7 +532,7 @@ class StockPicking(models.Model):
         total_qty = kh_format_qty(sum(qty for _product, qty in lines_qty))
         max_lines = max_lines if max_lines and max_lines > 0 else 3
         # room left after the bold "ទំនិញ Items (ចំនួន Qty N):" prefix and a "+N more" suffix
-        budget = width_mm * lines * 0.85 - text_width_mm(
+        budget = width_mm * lines * 0.9 - text_width_mm(
             'ទំនិញ Items (ចំនួន Qty %s): … +9 more' % total_qty, ITEMS_SIZE, bold=True)
         texts = []
         for product, qty in lines_qty[:max_lines]:
@@ -529,7 +543,8 @@ class StockPicking(models.Model):
                 break
             texts.append(text)
         if texts and text_width_mm(', '.join(texts), ITEMS_SIZE) > budget:
-            texts = [fit_width(texts[0], budget, ITEMS_SIZE)]
+            # not even the first product fits: shorten it, or only print the number of products
+            texts = [fit_width(texts[0], budget, ITEMS_SIZE)] if budget >= 14 else []
         return ', '.join(texts), len(lines_qty) - len(texts), total_qty
 
     def _kh_label_courier(self):
@@ -642,20 +657,30 @@ class StockPicking(models.Model):
         qr, qr_caption = self._kh_label_qr(company, qr_state)
         money = self._kh_get_money_values(W_PAYMENT if qr else W_PAYMENT_FULL)
 
-        # Items and handling instructions
+        # Items and handling instructions: the note has priority over the items summary
         has_chips = self.kh_fragile or self.kh_allow_check
         items_width = W_ITEMS if has_chips else W_ITEMS_FULL
-        note = kh_truncate(self.kh_label_note, MAX_NOTE)
         show_items = company.kh_label_show_items
+        note = kh_truncate(self.kh_label_note, MAX_NOTE)
         note_lines = 0
         if note:
-            note_lines = 1 if show_items else 3
-            note = fit_width('ចំណាំ Note: ' + note, items_width, NOTE_SIZE, bold=True, lines=note_lines)
-            note = note[len('ចំណាំ Note: '):] if note.startswith('ចំណាំ Note: ') else note
+            if not show_items:
+                note_lines = ITEMS_TEXT_LINES
+            elif text_width_mm(NOTE_PREFIX + note, NOTE_SIZE, bold=True) <= items_width:
+                note_lines = 1
+            else:
+                note_lines = 2
+            note = fit_width(NOTE_PREFIX + note, items_width, NOTE_SIZE, bold=True, lines=note_lines)
+            note = note[len(NOTE_PREFIX):] if note.startswith(NOTE_PREFIX) else note
         items, items_more, total_qty = ('', 0, '0')
-        if show_items:
+        items_lines = ITEMS_TEXT_LINES - note_lines if show_items else 0
+        if items_lines:
             items, items_more, total_qty = self._kh_get_label_items(
-                company.kh_label_max_item_lines, width_mm=items_width, lines=3 - note_lines)
+                company.kh_label_max_item_lines, width_mm=items_width, lines=items_lines)
+
+        # Several parcels: the amount is the total of the shipment, to collect once
+        if self.kh_parcel_count and self.kh_parcel_count > 1 and money['state'] == 'cod':
+            money['amount_size'] = min(money['amount_size'], AMOUNT_MAX_SIZE_MULTI_PARCEL)
 
         values = {
             'picking': self,
@@ -682,6 +707,8 @@ class StockPicking(models.Model):
             'allow_check': self.kh_allow_check,
             'fragile': self.kh_fragile,
             'note': note,
+            'note_lines': note_lines,
+            'items_lines': items_lines,
             # footer
             'barcode': self._kh_barcode_data_uri('Code128', self.name, width=1400, height=160, quiet=0),
             'footer': kh_truncate(company.kh_label_footer, MAX_FOOTER),
