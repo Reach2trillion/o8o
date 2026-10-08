@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 100 mm wide x 80 mm tall label. A custom size with width > height gives a 100 x 80 mm page
+         in Portrait with wkhtmltopdf 0.12.6 (checked with pdfinfo: 283.46 x 226.77 pt).
+         Margins are handled by the label itself (1.5 mm), smart shrinking is disabled so that
+         CSS millimetres are real millimetres. -->
+    <record id="paperformat_cod_label_100x80" model="report.paperformat">
+        <field name="name">COD Label 100 x 80 mm</field>
+        <field name="default" eval="False"/>
+        <field name="format">custom</field>
+        <field name="page_width">100</field>
+        <field name="page_height">80</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">0</field>
+        <field name="margin_bottom">0</field>
+        <field name="margin_left">0</field>
+        <field name="margin_right">0</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">96</field>
+        <field name="disable_shrinking" eval="True"/>
+    </record>
+
+    <!-- COD Label (PDF): Print menu of transfers and "COD Label" button of delivery orders -->
+    <record id="action_report_cod_label" model="ir.actions.report">
+        <field name="name">COD Label 100x80</field>
+        <field name="model">stock.picking</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">delivery_label_cod_kh.report_cod_label</field>
+        <field name="report_file">delivery_label_cod_kh.report_cod_label</field>
+        <field name="print_report_name">'COD Label - %s' % object.name</field>
+        <field name="paperformat_id" ref="paperformat_cod_label_100x80"/>
+        <field name="binding_model_id" ref="stock.model_stock_picking"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>

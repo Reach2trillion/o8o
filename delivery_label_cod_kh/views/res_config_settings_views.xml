@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Inventory > Settings > COD Delivery Label                         -->
+    <!-- ================================================================ -->
+    <record id="res_config_settings_view_form_cod_label" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.delivery_label_cod_kh</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='shipping_setting_container']" position="after">
+                <block title="COD Delivery Label" name="kh_cod_label_setting_container">
+                    <setting id="kh_label_khr_setting" string="Riel Conversion" company_dependent="1"
+                             help="How the amount to collect is converted between the order currency and Cambodian riel (KHR) on the 100 x 80 mm COD label.">
+                        <div class="content-group">
+                            <div class="mt8">
+                                <field name="kh_label_khr_rate_source" widget="radio"/>
+                            </div>
+                            <div class="row mt8">
+                                <label for="kh_label_khr_rate" string="Fixed rate (៛ per 1 USD)" class="col-lg-5 o_light_label"/>
+                                <field name="kh_label_khr_rate" class="col-lg-3"/>
+                            </div>
+                            <div class="row">
+                                <label for="kh_label_khr_rounding" string="Round riel to" class="col-lg-5 o_light_label"/>
+                                <field name="kh_label_khr_rounding" class="col-lg-3"/>
+                            </div>
+                            <div class="text-muted small mt4">
+                                The fixed rate is also used when the KHR currency is inactive or has no rate.
+                            </div>
+                        </div>
+                    </setting>
+                    <setting id="kh_label_show_khr_setting" string="Print Riel Equivalent" company_dependent="1"
+                             help="Print '≈ 69,100៛' under the amount to collect (or the dollar equivalent for orders in riel).">
+                        <field name="kh_label_show_khr"/>
+                    </setting>
+                    <setting id="kh_label_qr_setting" string="Label QR Code" company_dependent="1"
+                             help="Google Maps location of the receiver (transfer reference when the contact has no geolocation), the transfer reference, the shop's static ABA KHQR (only when money must be collected) or nothing.">
+                        <div class="content-group">
+                            <div class="mt8">
+                                <field name="kh_label_qr_content" widget="radio"/>
+                            </div>
+                            <div class="row mt8" invisible="kh_label_qr_content != 'khqr'">
+                                <label for="kh_label_khqr_image" class="col-lg-5 o_light_label"/>
+                                <field name="kh_label_khqr_image" widget="image" class="col-lg-3" options="{'size': [96, 96]}"/>
+                            </div>
+                        </div>
+                    </setting>
+                    <setting id="kh_label_show_items_setting" string="Print Item Summary" company_dependent="1"
+                             help="List the products on the label (disable it for discreet parcels).">
+                        <field name="kh_label_show_items"/>
+                        <div class="content-group" invisible="not kh_label_show_items">
+                            <div class="row mt8">
+                                <label for="kh_label_max_item_lines" class="col-lg-5 o_light_label"/>
+                                <field name="kh_label_max_item_lines" class="col-lg-3"/>
+                            </div>
+                        </div>
+                    </setting>
+                    <setting id="kh_label_texts_setting" string="Label Texts" company_dependent="1"
+                             help="Optional tagline under the company name and the thank-you line printed at the bottom of the label.">
+                        <div class="content-group">
+                            <div class="row mt8">
+                                <label for="kh_label_tagline" class="col-lg-3 o_light_label"/>
+                                <field name="kh_label_tagline" class="col-lg-9"/>
+                            </div>
+                            <div class="row">
+                                <label for="kh_label_footer" class="col-lg-3 o_light_label"/>
+                                <field name="kh_label_footer" class="col-lg-9"/>
+                            </div>
+                        </div>
+                    </setting>
+                    <setting id="kh_label_defaults_setting" string="Delivery Order Defaults" company_dependent="1"
+                             help="Default handling flags of new delivery orders (editable on each transfer, tab 'COD Label').">
+                        <div class="content-group">
+                            <div class="mt8">
+                                <field name="kh_label_allow_check_default" class="oe_inline"/>
+                                <label for="kh_label_allow_check_default" class="o_light_label ms-2"/>
+                            </div>
+                            <div>
+                                <field name="kh_label_fragile_default" class="oe_inline"/>
+                                <label for="kh_label_fragile_default" class="o_light_label ms-2"/>
+                            </div>
+                        </div>
+                    </setting>
+                </block>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

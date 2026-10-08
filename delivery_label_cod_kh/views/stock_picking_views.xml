@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================ -->
+    <!-- Transfer form: "COD Label" button and tab (delivery orders only)  -->
+    <!-- ================================================================ -->
+    <record id="view_picking_form_cod_label" model="ir.ui.view">
+        <field name="name">stock.picking.form.inherit.delivery_label_cod_kh</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.view_picking_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='do_print_picking']" position="before">
+                <button name="action_print_cod_label" string="COD Label" type="object" icon="fa-truck"
+                        invisible="picking_type_code != 'outgoing' or state == 'cancel'"
+                        groups="stock.group_stock_user"/>
+            </xpath>
+            <xpath expr="//notebook/page[@name='operations']" position="after">
+                <page string="COD Label" name="kh_cod_label" invisible="picking_type_code != 'outgoing'">
+                    <div class="alert alert-warning mb-2" role="alert" invisible="not kh_cod_warning">
+                        <i class="fa fa-exclamation-triangle me-1" title="Warning"/>
+                        <field name="kh_cod_warning" class="d-inline" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="Payment" name="kh_cod_payment">
+                            <field name="kh_cod_currency_id" invisible="1"/>
+                            <field name="kh_payment_mode" widget="radio" readonly="state == 'cancel'"/>
+                            <field name="kh_cod_amount_auto" string="Auto Amount (from order)" readonly="1"
+                                   invisible="kh_payment_mode != 'auto'"/>
+                            <field name="kh_cod_amount_manual" invisible="kh_payment_mode != 'manual'"
+                                   readonly="state == 'cancel'"/>
+                            <field name="kh_cod_state" readonly="1"/>
+                            <field name="kh_cod_amount" string="Amount on Label" readonly="1"
+                                   invisible="not kh_cod_amount"/>
+                        </group>
+                        <group string="Delivery" name="kh_cod_delivery">
+                            <field name="kh_receiver_phone" placeholder="e.g. 012 345 678"/>
+                            <field name="kh_parcel_count"/>
+                            <field name="kh_fragile"/>
+                            <field name="kh_allow_check"/>
+                            <field name="kh_label_note" placeholder="e.g. Call before 5pm"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Transfer list: optional COD amount column                         -->
+    <!-- ================================================================ -->
+    <record id="vpicktree_cod_label" model="ir.ui.view">
+        <field name="name">stock.picking.list.inherit.delivery_label_cod_kh</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='origin']" position="after">
+                <field name="kh_cod_currency_id" column_invisible="True"/>
+                <field name="kh_cod_amount" string="COD" optional="show" widget="monetary"
+                       options="{'currency_field': 'kh_cod_currency_id'}"
+                       invisible="not kh_cod_amount"/>
+                <field name="kh_cod_state" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

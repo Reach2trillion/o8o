@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ================================================================
+         COD Delivery Label 100 x 80 mm
+         Values come from report/cod_label_report.py -> labels: list of dicts built by
+         stock.picking._kh_get_label_values() (one dict per parcel). Long texts are fitted to
+         their box in Python (models/kh_label_text.py) and font sizes chosen there; the box
+         widths used for that are mirrored in models/stock_picking.py (W_* constants).
+
+         Renderer notes (wkhtmltopdf 0.12.6, old Qt WebKit):
+           * no flexbox / grid / CSS variables; fixed-layout tables, absolute mm heights,
+             overflow:hidden boxes as a safety net;
+           * black and white only (no grey: thermal printers dither it), borders >= 0.3 mm,
+             fonts >= 6 pt; Khmer glyphs come from the Khmer fonts of the fallback stack;
+           * one div.article per label: every label is rendered as its own document, i.e. its
+             own page (N labels -> N pages, never a trailing blank page). The style sheet is
+             inside the article so each document is self-contained.
+         Avoid the CSS classes "header", "footer" and "article" inside the label: Odoo moves
+         such divs out of the page body.
+         ================================================================ -->
+
+    <template id="report_cod_label_style">
+        <style>
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: auto !important;
+                max-width: none !important;
+                height: auto !important;
+                min-height: 0 !important;
+                background: #fff !important;
+            }
+            .o_kh_page {
+                margin: 0;
+                padding: 1.5mm 0 0 1.5mm;
+                page-break-inside: avoid;
+            }
+            .o_kh_label, .o_kh_label * {
+                -webkit-box-sizing: border-box;
+                box-sizing: border-box;
+            }
+            .o_kh_label {
+                position: relative;
+                width: 97mm;
+                height: 77mm;
+                overflow: hidden;
+                border: 0.4mm solid #000;
+                background: #fff;
+                color: #000;
+                font-family: Arial, 'Liberation Sans', 'DejaVu Sans', 'Khmer OS Battambang', 'Khmer OS Siemreap', 'Noto Sans Khmer', 'Khmer OS', sans-serif;
+                font-size: 8pt;
+                line-height: 1.2;
+                text-align: left;
+                word-wrap: break-word;
+            }
+            .o_kh_label table {
+                width: 100%;
+                table-layout: fixed;
+                border-collapse: collapse;
+                border-spacing: 0;
+                border: 0 !important;
+                margin: 0;
+                color: #000;
+                background: transparent;
+                font-size: inherit;
+            }
+            .o_kh_label tbody, .o_kh_label tr { border: 0 !important; }
+            .o_kh_label td {
+                padding: 0;
+                vertical-align: top;
+                overflow: hidden;
+                border: 0;
+            }
+            .o_kh_label img { display: block; border: 0; }
+            .o_kh_b { font-weight: bold; }
+            .o_kh_center { text-align: center; }
+            .o_kh_middle { vertical-align: middle !important; }
+            .o_kh_sep { border-left: 0.3mm solid #000 !important; }
+            .o_kh_pad { padding: 0.5mm 1.6mm !important; }
+            .o_kh_line { white-space: nowrap; overflow: hidden; }
+
+            /* sections: heights include their 0.3 mm bottom rule (label inner height 76.2 mm) */
+            .o_kh_sec { position: relative; overflow: hidden; border-bottom: 0.3mm solid #000; }
+            .o_kh_sec_head { height: 11.5mm; }
+            .o_kh_sec_head table.o_kh_cols { height: 11.2mm; }
+            .o_kh_sec_recv { height: 26.5mm; }
+            .o_kh_sec_recv table.o_kh_cols { height: 26.2mm; }
+            .o_kh_sec_pay { height: 19.5mm; }
+            .o_kh_sec_pay table.o_kh_cols { height: 19.2mm; }
+            .o_kh_sec_items { height: 10.7mm; }
+            .o_kh_sec_items table.o_kh_cols { height: 10.4mm; }
+            .o_kh_sec_foot { height: 8mm; border-bottom: 0; }
+            .o_kh_sec_foot table.o_kh_cols { height: 8mm; }
+
+            /* 1. header */
+            .o_kh_logo_cell { width: 11.5mm; }
+            .o_kh_logo { max-width: 10.5mm; max-height: 10mm; }
+            .o_kh_company { font-size: 9pt; font-weight: bold; line-height: 1.15; height: 3.7mm; }
+            .o_kh_tagline { font-size: 6pt; line-height: 1.3; height: 2.9mm; }
+            .o_kh_cphone { font-size: 7.5pt; font-weight: bold; line-height: 1.25; }
+            .o_kh_ref { font-size: 8.5pt; font-weight: bold; line-height: 1.25; }
+            .o_kh_meta { font-size: 6.5pt; line-height: 1.3; }
+            .o_kh_courier { font-size: 7pt; font-weight: bold; line-height: 1.25; height: 3.1mm; }
+            .o_kh_parcel_line { font-size: 6pt; line-height: 1.2; }
+            .o_kh_parcel { font-size: 11pt; font-weight: bold; }
+
+            /* 2. receiver */
+            .o_kh_tag { font-size: 6.5pt; font-weight: bold; line-height: 1.3; height: 2.9mm; }
+            .o_kh_name { font-weight: bold; height: 5.6mm; line-height: 5.6mm; }
+            .o_kh_phone { font-weight: bold; height: 7.2mm; line-height: 7.2mm; }
+            .o_kh_phone_icon { font-size: 11pt; font-weight: normal; }
+            .o_kh_blank { display: inline-block; border-bottom: 0.3mm solid #000; height: 4mm; vertical-align: baseline; }
+            .o_kh_address { font-size: 8pt; line-height: 1.27; height: 10.4mm; overflow: hidden; }
+            .o_kh_address_blank { font-size: 7pt; line-height: 1.6; height: 10.4mm; overflow: hidden; }
+            .o_kh_province_cell { width: 27.5mm; padding: 1mm 1.2mm 1mm 0 !important; }
+            .o_kh_province_box { border: 0.5mm solid #000; }
+            .o_kh_province_box table { height: 23.2mm; }
+            .o_kh_province_box td { padding: 0 0.8mm !important; }
+            .o_kh_province_label { font-size: 6pt; font-weight: bold; line-height: 1.3; }
+            .o_kh_province_prefix { font-size: 8pt; font-weight: bold; line-height: 1.3; margin-top: 0.8mm; }
+            .o_kh_province_name { font-weight: bold; line-height: 1.3; max-height: 12mm; overflow: hidden; }
+
+            /* 3. payment */
+            .o_kh_pay_cod { background: #000 !important; color: #fff !important; padding: 0.4mm 2mm !important; vertical-align: middle !important; }
+            .o_kh_pay_cod div, .o_kh_pay_cod span { color: #fff !important; }
+            .o_kh_pay_title { font-size: 8pt; font-weight: bold; line-height: 1.3; }
+            .o_kh_amount_line { white-space: nowrap; overflow: hidden; line-height: 1.1; }
+            .o_kh_amount { font-weight: bold; }
+            .o_kh_secondary { font-size: 12pt; font-weight: bold; padding-left: 2mm; }
+            .o_kh_breakdown { font-size: 6.5pt; line-height: 1.3; }
+            .o_kh_pay_cell { padding: 1.2mm 1.6mm !important; }
+            .o_kh_paid_box { border: 0.9mm solid #000; }
+            .o_kh_paid_box table { height: 15mm; }
+            .o_kh_paid_title { font-size: 15pt; font-weight: bold; line-height: 1.25; white-space: nowrap; }
+            .o_kh_paid_sub { font-size: 8.5pt; font-weight: bold; line-height: 1.3; white-space: nowrap; }
+            .o_kh_none_box { border: 0.3mm solid #000; }
+            .o_kh_none_box table { height: 16.2mm; }
+            .o_kh_none_title { font-size: 12pt; font-weight: bold; line-height: 1.3; white-space: nowrap; }
+            .o_kh_none_sub { font-size: 7pt; line-height: 1.3; white-space: nowrap; }
+            .o_kh_qr_cell { width: 25mm; padding: 0.6mm 1mm 0 1mm !important; text-align: center; }
+            .o_kh_qr { width: 13.6mm; height: 13.6mm; margin: 0 auto; }
+            .o_kh_qr_caption { font-size: 6pt; line-height: 1.2; max-height: 5mm; overflow: hidden; text-align: center; white-space: nowrap; }
+
+            /* 4. items and instructions */
+            .o_kh_items { font-size: 6.5pt; line-height: 1.3; max-height: 9.3mm; overflow: hidden; }
+            .o_kh_items_2 { max-height: 6.2mm; }
+            .o_kh_items_1 { max-height: 3.1mm; }
+            .o_kh_note { font-size: 7pt; font-weight: bold; line-height: 1.25; max-height: 9.3mm; overflow: hidden; }
+            .o_kh_chips_cell { width: 40mm; padding: 0.8mm 1.2mm 0 0 !important; }
+            .o_kh_chip { border: 0.3mm solid #000; font-size: 6pt; font-weight: bold; line-height: 1.3; padding: 0.2mm 0.8mm; margin-bottom: 0.6mm; white-space: nowrap; overflow: hidden; }
+            .o_kh_chip_inv { background: #000 !important; color: #fff !important; }
+
+            /* 5. footer */
+            .o_kh_barcode_cell { width: 52mm; padding: 0.6mm 2.8mm 0 2.8mm !important; }
+            .o_kh_barcode { width: 46mm; height: 4.6mm; }
+            .o_kh_barcode_text { font-size: 6pt; font-weight: bold; line-height: 1.2; letter-spacing: 0.25mm; text-align: center; white-space: nowrap; overflow: hidden; }
+            .o_kh_footer_text { font-size: 6pt; line-height: 1.3; max-height: 7.4mm; overflow: hidden; text-align: center; }
+        </style>
+    </template>
+
+    <!-- 1. Header: sender | references | courier / parcel -->
+    <template id="report_cod_label_head">
+        <div class="o_kh_sec o_kh_sec_head">
+            <table class="o_kh_cols"><tr>
+                <td class="o_kh_pad o_kh_middle" style="width: 47mm;">
+                    <table><tr>
+                        <td t-if="label['logo']" class="o_kh_logo_cell o_kh_middle">
+                            <img class="o_kh_logo" t-att-src="label['logo']" alt="Logo"/>
+                        </td>
+                        <td class="o_kh_middle">
+                            <div class="o_kh_company o_kh_line" t-out="label['company_name']"/>
+                            <div t-if="label['tagline']" class="o_kh_tagline o_kh_line" t-out="label['tagline']"/>
+                            <div t-if="label['company_phone']" class="o_kh_cphone o_kh_line">&#9742; <t t-out="label['company_phone']"/></div>
+                        </td>
+                    </tr></table>
+                </td>
+                <td class="o_kh_pad o_kh_sep o_kh_middle" style="width: 25mm;">
+                    <div class="o_kh_ref o_kh_line" t-out="label['reference']"/>
+                    <div t-if="label['order_ref']" class="o_kh_meta o_kh_line" t-out="label['order_ref']"/>
+                    <div t-if="label['date']" class="o_kh_meta o_kh_line" t-out="label['date']"/>
+                </td>
+                <td class="o_kh_pad o_kh_sep o_kh_middle o_kh_center">
+                    <div t-if="label['courier']" class="o_kh_courier o_kh_line" t-out="label['courier']"/>
+                    <div class="o_kh_parcel_line o_kh_line">កញ្ចប់ Parcel <span class="o_kh_parcel" t-out="label['parcel_label']"/></div>
+                    <div t-if="label['weight']" class="o_kh_meta o_kh_line" t-out="label['weight']"/>
+                </td>
+            </tr></table>
+        </div>
+    </template>
+
+    <!-- 2. Receiver: name, phone, address | province box -->
+    <template id="report_cod_label_receiver">
+        <div class="o_kh_sec o_kh_sec_recv">
+            <table class="o_kh_cols"><tr>
+                <td class="o_kh_pad">
+                    <div class="o_kh_tag o_kh_line">អ្នកទទួល · TO</div>
+                    <div class="o_kh_name o_kh_line" t-attf-style="font-size: #{label['name_size']}pt;" t-out="label['receiver_name']"/>
+                    <div class="o_kh_phone o_kh_line" t-attf-style="font-size: #{label['phone_size']}pt;">
+                        <span class="o_kh_phone_icon">&#9742;</span>
+                        <t t-if="label['phones']">
+                            <span t-out="label['phones'][0]"/>
+                            <span t-if="len(label['phones']) &gt; 1" t-attf-style="font-size: #{label['phone2_size']}pt;">/ <t t-out="label['phones'][1]"/></span>
+                        </t>
+                        <span t-else="" class="o_kh_blank" style="width: 46mm;"/>
+                    </div>
+                    <div t-if="label['address']" class="o_kh_address" t-out="label['address']"/>
+                    <div t-else="" class="o_kh_address_blank">
+                        អាសយដ្ឋាន Address: <span class="o_kh_blank" style="width: 38mm;"/><br/>
+                        <span class="o_kh_blank" style="width: 62mm;"/>
+                    </div>
+                </td>
+                <td t-if="label['province']" class="o_kh_province_cell">
+                    <div class="o_kh_province_box">
+                        <table><tr><td class="o_kh_middle o_kh_center">
+                            <div class="o_kh_province_label">ខេត្ត/ក្រុង</div>
+                            <div class="o_kh_province_label">PROVINCE</div>
+                            <div t-if="label['province_prefix']" class="o_kh_province_prefix" t-out="label['province_prefix']"/>
+                            <div class="o_kh_province_name" t-attf-style="font-size: #{label['province_size']}pt;" t-out="label['province_main']"/>
+                        </td></tr></table>
+                    </div>
+                </td>
+            </tr></table>
+        </div>
+    </template>
+
+    <!-- 3. Payment: COD amount (black box) / PAID / NO COD | QR code -->
+    <template id="report_cod_label_payment">
+        <t t-set="money" t-value="label['money']"/>
+        <div t-attf-class="o_kh_sec o_kh_sec_pay o_kh_state_#{money['state']}">
+            <table class="o_kh_cols"><tr>
+                <td t-if="money['state'] == 'cod'" class="o_kh_pay_cod">
+                    <div class="o_kh_pay_title o_kh_line">COD · ប្រាក់ត្រូវប្រមូល</div>
+                    <div class="o_kh_amount_line">
+                        <span class="o_kh_amount" t-attf-style="font-size: #{money['amount_size']}pt;" t-out="money['amount_str']"/>
+                        <span t-if="money['secondary_str']" class="o_kh_secondary" t-out="money['secondary_str']"/>
+                    </div>
+                    <div t-if="money['goods_str']" class="o_kh_breakdown o_kh_line">
+                        ថ្លៃទំនិញ Goods <t t-out="money['goods_str']"/> + ថ្លៃដឹក Delivery <t t-out="money['fee_str']"/>
+                    </div>
+                </td>
+                <td t-elif="money['state'] == 'paid'" class="o_kh_pay_cell">
+                    <div class="o_kh_paid_box">
+                        <table><tr><td class="o_kh_middle o_kh_center">
+                            <div class="o_kh_paid_title">PAID · បានទូទាត់រួច</div>
+                            <div class="o_kh_paid_sub">DO NOT COLLECT · មិនត្រូវប្រមូលប្រាក់</div>
+                        </td></tr></table>
+                    </div>
+                </td>
+                <td t-else="" class="o_kh_pay_cell">
+                    <div class="o_kh_none_box">
+                        <table><tr><td class="o_kh_middle o_kh_center">
+                            <div class="o_kh_none_title">NO COD · មិនប្រមូលប្រាក់</div>
+                            <div class="o_kh_none_sub">Nothing to collect</div>
+                        </td></tr></table>
+                    </div>
+                </td>
+                <td t-if="label['qr']" class="o_kh_qr_cell">
+                    <img class="o_kh_qr" t-att-src="label['qr']" alt="QR"/>
+                    <div class="o_kh_qr_caption">
+                        <t t-foreach="label['qr_caption'].split('\n')" t-as="caption_line">
+                            <t t-out="caption_line"/><br t-if="not caption_line_last"/>
+                        </t>
+                    </div>
+                </td>
+            </tr></table>
+        </div>
+    </template>
+
+    <!-- 4. Items summary, note | handling chips -->
+    <template id="report_cod_label_items">
+        <div class="o_kh_sec o_kh_sec_items">
+            <table class="o_kh_cols"><tr>
+                <td class="o_kh_pad">
+                    <div t-if="label['show_items'] and label['items']"
+                         t-attf-class="o_kh_items #{'o_kh_items_2' if label['note'] else ''}">
+                        <b>ទំនិញ Items (ចំនួន Qty <t t-out="label['total_qty']"/>):</b>
+                        <t t-out="label['items']"/><b t-if="label['items_more']"> … +<t t-out="label['items_more']"/> more</b>
+                    </div>
+                    <div t-if="label['note']" class="o_kh_note">ចំណាំ Note: <t t-out="label['note']"/></div>
+                </td>
+                <td t-if="label['fragile'] or label['allow_check']" class="o_kh_chips_cell">
+                    <div t-if="label['fragile']" class="o_kh_chip o_kh_chip_inv">&#9888; ប្រយ័ត្នបែក FRAGILE</div>
+                    <div t-if="label['allow_check']" class="o_kh_chip">&#10003; អនុញ្ញាតឱ្យពិនិត្យទំនិញ Allow check</div>
+                </td>
+            </tr></table>
+        </div>
+    </template>
+
+    <!-- 5. Footer: Code128 barcode of the transfer | thank-you text -->
+    <template id="report_cod_label_foot">
+        <div class="o_kh_sec o_kh_sec_foot">
+            <table class="o_kh_cols"><tr>
+                <td class="o_kh_barcode_cell">
+                    <img t-if="label['barcode']" class="o_kh_barcode" t-att-src="label['barcode']" alt="Barcode"/>
+                    <div class="o_kh_barcode_text" t-out="label['reference']"/>
+                </td>
+                <td class="o_kh_pad o_kh_middle">
+                    <div t-if="label['footer']" class="o_kh_footer_text" t-out="label['footer']"/>
+                </td>
+            </tr></table>
+        </div>
+    </template>
+
+    <!-- One label = one article = one 100 x 80 mm page -->
+    <template id="report_cod_label_document">
+        <div class="article o_kh_label_article" data-oe-model="stock.picking" t-att-data-oe-id="label['picking'].id">
+            <t t-call="delivery_label_cod_kh.report_cod_label_style"/>
+            <div class="page o_kh_page">
+                <div class="o_kh_label" t-att-data-cod-state="label['money']['state']">
+                    <t t-call="delivery_label_cod_kh.report_cod_label_head"/>
+                    <t t-call="delivery_label_cod_kh.report_cod_label_receiver"/>
+                    <t t-call="delivery_label_cod_kh.report_cod_label_payment"/>
+                    <t t-call="delivery_label_cod_kh.report_cod_label_items"/>
+                    <t t-call="delivery_label_cod_kh.report_cod_label_foot"/>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="report_cod_label">
+        <t t-call="web.html_container">
+            <t t-foreach="labels" t-as="label">
+                <t t-call="delivery_label_cod_kh.report_cod_label_document"/>
+            </t>
+        </t>
+    </template>
+
+</odoo>
