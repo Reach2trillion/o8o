@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Phone screen: a dedicated OWL client action (JS / CSS in the lazy bundle checkinme_sales_activity.assets_screen) -->
+    <record id="action_checkinme_screen" model="ir.actions.client">
+        <field name="name">CheckinMe</field>
+        <field name="tag">checkinme_sales_activity.screen</field>
+        <field name="target">current</field>
+    </record>
+
+    <!-- "Install on phone": Odoo's scoped-app page installs the screen as a standalone app (PWA) -->
+    <record id="action_checkinme_install" model="ir.actions.act_url">
+        <field name="name">Install on phone</field>
+        <field name="url">/scoped_app?app_id=checkinme_sales_activity&amp;app_name=CheckinMe&amp;path=odoo/action-checkinme_sales_activity.action_checkinme_screen</field>
+        <field name="target">self</field>
+    </record>
+
+    <!-- Open a check-in in the phone screen from the backend list / form -->
+    <record id="server_action_open_in_screen" model="ir.actions.server">
+        <field name="name">Open in phone screen</field>
+        <field name="model_id" ref="model_checkinme_checkin"/>
+        <field name="binding_model_id" ref="model_checkinme_checkin"/>
+        <field name="binding_type">action</field>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">
+record = records[:1]
+action = {
+    'type': 'ir.actions.client',
+    'tag': 'checkinme_sales_activity.screen',
+    'target': 'current',
+    'context': {'checkinme_open_id': record.id if record else False},
+}
+        </field>
+    </record>
+</odoo>

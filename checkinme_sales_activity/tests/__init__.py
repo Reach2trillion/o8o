@@ -5,3 +5,4 @@ from . import test_telegram
 from . import test_report
 from . import test_security
 from . import test_fixes
+from . import test_mobile

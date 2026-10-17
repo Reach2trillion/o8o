@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="checkinme_sales_activity.Screen">
+        <div class="o_checkinme_screen">
+            <div class="o_checkinme_screen_body">
+                <header class="o_checkinme_topbar">
+                    <button t-if="state.view !== 'home'" type="button" class="o_checkinme_topbar_btn" t-on-click="goHome" aria-label="Back">
+                        <i class="fa fa-chevron-left"/>
+                    </button>
+                    <div class="o_checkinme_topbar_text">
+                        <div class="o_checkinme_topbar_title" t-esc="title"/>
+                        <div t-if="state.dashboard" class="o_checkinme_topbar_sub" t-esc="state.dashboard.employee.name"/>
+                    </div>
+                    <button t-if="state.view !== 'history'" type="button" class="o_checkinme_topbar_btn" t-on-click="openHistory" aria-label="My visits" title="My visits">
+                        <i class="fa fa-history"/>
+                    </button>
+                </header>
+                <main class="o_checkinme_main">
+                    <div t-if="state.loading" class="o_checkinme_loading"><i class="fa fa-spinner fa-spin fa-2x"/></div>
+                    <t t-elif="!state.dashboard" >
+                        <div class="o_checkinme_card text-danger">The screen could not be loaded. Please try again.</div>
+                    </t>
+                    <t t-elif="state.view === 'home'" t-call="checkinme_sales_activity.ScreenHome"/>
+                    <t t-elif="state.view === 'checkin'" t-call="checkinme_sales_activity.ScreenCheckin"/>
+                    <t t-elif="state.view === 'checkout'" t-call="checkinme_sales_activity.ScreenCheckout"/>
+                    <t t-elif="state.view === 'result'" t-call="checkinme_sales_activity.ScreenResult"/>
+                    <t t-elif="state.view === 'history'" t-call="checkinme_sales_activity.ScreenHistory"/>
+                </main>
+            </div>
+        </div>
+    </t>
+
+    <!-- ============================ HOME ============================ -->
+    <t t-name="checkinme_sales_activity.ScreenHome">
+        <t t-set="d" t-value="state.dashboard"/>
+        <div t-if="!d.employee.has_employee" class="o_checkinme_card o_checkinme_card_warning">
+            <i class="fa fa-exclamation-triangle me-2"/>Your user is not linked to an employee. Ask your administrator to create your employee record before checking in.
+        </div>
+
+        <section class="o_checkinme_card">
+            <div class="o_checkinme_card_title"><i class="fa fa-calendar-o me-2"/><t t-esc="d.today_label"/></div>
+            <div class="o_checkinme_stats">
+                <div class="o_checkinme_stat"><div class="o_checkinme_stat_value" t-esc="d.today_stats.visits"/><div class="o_checkinme_stat_label">Visits</div></div>
+                <div class="o_checkinme_stat"><div class="o_checkinme_stat_value text-success" t-esc="d.today_stats.verified"/><div class="o_checkinme_stat_label">Verified</div></div>
+                <div class="o_checkinme_stat"><div class="o_checkinme_stat_value" t-esc="d.today_stats.customers"/><div class="o_checkinme_stat_label">Customers</div></div>
+                <div class="o_checkinme_stat"><div class="o_checkinme_stat_value" t-esc="d.today_stats.checkins"/><div class="o_checkinme_stat_label">Check-ins</div></div>
+            </div>
+        </section>
+
+        <section t-if="d.open_visit" class="o_checkinme_card o_checkinme_card_open">
+            <div class="o_checkinme_card_title"><span class="o_checkinme_dot"/>Checked in &#183; <t t-esc="openVisitElapsed"/></div>
+            <div class="o_checkinme_visit_name" t-esc="d.open_visit.partner_name or d.open_visit.type_name"/>
+            <div class="o_checkinme_muted">
+                <i t-attf-class="fa {{ d.open_visit.type_icon }} me-1"/><t t-esc="d.open_visit.type_name"/>
+                &#183; since <t t-esc="d.open_visit.checkin_time_local"/>
+                <t t-if="d.open_visit.location_status === 'verified'"> &#183; <span class="text-success"><i class="fa fa-check-circle"/> on site</span></t>
+                <t t-elif="d.open_visit.location_status === 'far'"> &#183; <span class="text-warning"><i class="fa fa-exclamation-circle"/> <t t-esc="formatDistance(d.open_visit.distance_to_partner)"/> away</span></t>
+            </div>
+            <div class="o_checkinme_row mt-3">
+                <button type="button" class="btn btn-primary o_checkinme_btn_lg flex-grow-1" t-on-click="() => this.startCheckout(d.open_visit)"><i class="fa fa-flag-checkered me-2"/>Check Out</button>
+                <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="() => this.openRecord(d.open_visit.id)" aria-label="Details"><i class="fa fa-pencil"/></button>
+            </div>
+        </section>
+
+        <button type="button" t-attf-class="btn o_checkinme_btn_xl w-100 {{ d.open_visit ? 'btn-outline-primary' : 'btn-primary' }}"
+                t-att-disabled="!d.employee.has_employee" t-on-click="() => this.startCheckin()">
+            <i class="fa fa-map-marker me-2"/>Check In Now
+        </button>
+
+        <section t-if="d.target" class="o_checkinme_card">
+            <div class="o_checkinme_card_title d-flex align-items-center">
+                <span><i class="fa fa-bullseye me-2"/>This month</span>
+                <span t-attf-class="o_checkinme_badge ms-auto o_checkinme_badge_{{ d.target.status }}" t-esc="d.target.status_label"/>
+            </div>
+            <div t-if="d.target.sales.target" class="o_checkinme_progress_row">
+                <div class="d-flex justify-content-between"><span>Sales</span><span><t t-esc="d.target.sales.actual_display"/> / <t t-esc="d.target.sales.target_display"/></span></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.sales.pct) }}%"/></div>
+            </div>
+            <div t-if="d.target.visits.target" class="o_checkinme_progress_row">
+                <div class="d-flex justify-content-between"><span>Visits</span><span><t t-esc="d.target.visits.actual"/> / <t t-esc="d.target.visits.target"/></span></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.visits.pct) }}%"/></div>
+            </div>
+            <div t-if="d.target.new_customers.target" class="o_checkinme_progress_row">
+                <div class="d-flex justify-content-between"><span>New customers</span><span><t t-esc="d.target.new_customers.actual"/> / <t t-esc="d.target.new_customers.target"/></span></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.new_customers.pct) }}%"/></div>
+            </div>
+            <div t-if="d.target.orders.target" class="o_checkinme_progress_row">
+                <div class="d-flex justify-content-between"><span>Orders</span><span><t t-esc="d.target.orders.actual"/> / <t t-esc="d.target.orders.target"/></span></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.orders.pct) }}%"/></div>
+            </div>
+            <div class="o_checkinme_muted mt-2"><t t-esc="d.target.days_remaining"/> days left &#183; expected <t t-esc="Math.round(d.target.expected_progress)"/>% by today</div>
+        </section>
+
+        <section t-if="d.planned_today.length" class="o_checkinme_card">
+            <div class="o_checkinme_card_title"><i class="fa fa-list-ul me-2"/>Planned visits</div>
+            <div t-foreach="d.planned_today" t-as="visit" t-key="visit.id" class="o_checkinme_list_item">
+                <div class="o_checkinme_list_main">
+                    <div class="o_checkinme_list_title" t-esc="visit.partner_name or visit.type_name"/>
+                    <div class="o_checkinme_muted"><i t-attf-class="fa {{ visit.type_icon }} me-1"/><t t-esc="visit.type_name"/><t t-if="visit.purpose"> &#183; <t t-esc="visit.purpose"/></t></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm o_checkinme_btn_md" t-on-click="() => this.startCheckin(visit)">Check In</button>
+            </div>
+        </section>
+
+        <section class="o_checkinme_card">
+            <div class="o_checkinme_card_title"><i class="fa fa-check-square-o me-2"/>Today's visits</div>
+            <div t-if="!d.today_visits.length" class="o_checkinme_muted">No visit yet today.</div>
+            <div t-foreach="d.today_visits" t-as="visit" t-key="visit.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.openRecord(visit.id)">
+                <div class="o_checkinme_list_time" t-esc="visit.checkin_time_local"/>
+                <div class="o_checkinme_list_main">
+                    <div class="o_checkinme_list_title" t-esc="visit.partner_name or visit.type_name"/>
+                    <div class="o_checkinme_muted"><t t-esc="visit.type_name"/><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
+                </div>
+                <span t-attf-class="o_checkinme_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
+            </div>
+        </section>
+
+        <div class="o_checkinme_footer">
+            <a href="#" t-on-click.prevent="openFullApp">Open the full application</a>
+        </div>
+    </t>
+
+    <!-- ============================ CHECK-IN ============================ -->
+    <t t-name="checkinme_sales_activity.ScreenCheckin">
+        <t t-set="c" t-value="state.checkin"/>
+        <ol class="o_checkinme_steps">
+            <li t-attf-class="{{ c.step === 'location' ? 'active' : 'done' }}"><span>1</span>Location</li>
+            <li t-attf-class="{{ c.step === 'customer' ? 'active' : (c.step === 'details' ? 'done' : '') }}"><span>2</span>Customer</li>
+            <li t-attf-class="{{ c.step === 'details' ? 'active' : '' }}"><span>3</span>Details</li>
+        </ol>
+
+        <!-- Step 1: GPS -->
+        <t t-if="c.step === 'location'">
+            <section class="o_checkinme_card text-center">
+                <t t-if="state.geo.status === 'locating'">
+                    <div class="o_checkinme_geo_icon"><i class="fa fa-crosshairs fa-spin"/></div>
+                    <div class="o_checkinme_visit_name">Getting your position...</div>
+                    <div class="o_checkinme_muted">Stay still for a few seconds.</div>
+                </t>
+                <t t-elif="state.geo.status === 'ok'">
+                    <div class="o_checkinme_geo_icon text-success"><i class="fa fa-map-marker"/></div>
+                    <div class="o_checkinme_visit_name">Position captured</div>
+                    <div class="o_checkinme_mono"><t t-esc="formatCoord(state.geo.latitude)"/>, <t t-esc="formatCoord(state.geo.longitude)"/></div>
+                    <div class="o_checkinme_muted" t-if="state.geo.accuracy">Accuracy &#177;<t t-esc="state.geo.accuracy"/> m</div>
+                </t>
+                <t t-else="">
+                    <div class="o_checkinme_geo_icon text-danger"><i class="fa fa-exclamation-triangle"/></div>
+                    <div class="o_checkinme_visit_name">No GPS position</div>
+                    <div class="o_checkinme_muted" t-esc="state.geo.error"/>
+                </t>
+                <div class="o_checkinme_row mt-3">
+                    <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="captureGps" t-att-disabled="state.geo.status === 'locating'"><i class="fa fa-refresh me-2"/>Retry</button>
+                    <button type="button" class="btn btn-primary o_checkinme_btn_lg flex-grow-1" t-on-click="continueFromLocation" t-att-disabled="state.geo.status === 'locating' or (requireGps and !hasPosition)">Continue<i class="fa fa-arrow-right ms-2"/></button>
+                </div>
+                <div t-if="requireGps" class="o_checkinme_muted mt-2">A GPS position is required to check in.</div>
+            </section>
+        </t>
+
+        <!-- Step 2: customer -->
+        <t t-if="c.step === 'customer'">
+            <div class="o_checkinme_search">
+                <i class="fa fa-search"/>
+                <input type="search" class="form-control" placeholder="Search customer by name or phone" t-att-value="state.customerQuery" t-on-input="onCustomerInput" autofocus="autofocus"/>
+            </div>
+            <div class="o_checkinme_row mb-2">
+                <button type="button" class="btn btn-outline-primary o_checkinme_btn_md flex-grow-1" t-on-click="toggleNewCustomer"><i class="fa fa-plus me-1"/>New customer</button>
+                <button type="button" class="btn btn-link o_checkinme_btn_md" t-on-click="skipCustomer">No customer</button>
+            </div>
+            <section t-if="c.newCustomer.open" class="o_checkinme_card">
+                <div class="o_checkinme_card_title">New customer</div>
+                <input type="text" class="form-control mb-2" placeholder="Name *" t-model="c.newCustomer.name"/>
+                <input type="tel" class="form-control mb-2" placeholder="Phone" t-model="c.newCustomer.phone"/>
+                <input type="text" class="form-control mb-2" placeholder="Street" t-model="c.newCustomer.street"/>
+                <input type="text" class="form-control mb-2" placeholder="City" t-model="c.newCustomer.city"/>
+                <div class="o_checkinme_muted mb-2" t-if="hasPosition"><i class="fa fa-map-marker me-1"/>Your current position will be saved as the customer's location.</div>
+                <button type="button" class="btn btn-primary o_checkinme_btn_lg w-100" t-on-click="createCustomer" t-att-disabled="state.busy">Create and select</button>
+            </section>
+            <div t-if="state.searching" class="o_checkinme_muted text-center py-2"><i class="fa fa-spinner fa-spin me-1"/>Searching...</div>
+            <t t-foreach="customerSections" t-as="section" t-key="section.key">
+                <div class="o_checkinme_section_label" t-esc="section.label"/>
+                <div t-foreach="section.items" t-as="customer" t-key="customer.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.selectCustomer(customer)">
+                    <div class="o_checkinme_list_main">
+                        <div class="o_checkinme_list_title" t-esc="customer.name"/>
+                        <div class="o_checkinme_muted" t-if="customer.address" t-esc="customer.address"/>
+                        <div class="o_checkinme_muted" t-if="customer.last_visit">Last visit <t t-esc="customer.last_visit"/></div>
+                    </div>
+                    <span t-if="customer.distance_m !== null and customer.distance_m !== undefined" class="o_checkinme_badge o_checkinme_badge_distance" t-esc="formatDistance(customer.distance_m)"/>
+                    <i class="fa fa-chevron-right o_checkinme_muted ms-2"/>
+                </div>
+            </t>
+            <div t-if="!state.searching and !customerSections.length" class="o_checkinme_muted text-center py-3">
+                <t t-if="state.customerQuery">No customer found for "<t t-esc="state.customerQuery"/>".</t>
+                <t t-else="">Type a name, or create the customer.</t>
+            </div>
+        </t>
+
+        <!-- Step 3: details -->
+        <t t-if="c.step === 'details'">
+            <section class="o_checkinme_card">
+                <div class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.goToStep('customer')">
+                    <div class="o_checkinme_list_main">
+                        <div class="o_checkinme_muted">Customer</div>
+                        <div class="o_checkinme_list_title" t-esc="c.partner ? c.partner.name : 'No customer'"/>
+                        <div class="o_checkinme_muted" t-if="c.partner and c.partner.address" t-esc="c.partner.address"/>
+                    </div>
+                    <span t-if="c.partner and c.partner.distance_m !== null and c.partner.distance_m !== undefined" class="o_checkinme_badge o_checkinme_badge_distance" t-esc="formatDistance(c.partner.distance_m)"/>
+                    <i class="fa fa-pencil o_checkinme_muted ms-2"/>
+                </div>
+            </section>
+
+            <div class="o_checkinme_section_label">Activity type</div>
+            <div class="o_checkinme_tiles">
+                <button t-foreach="state.dashboard.types" t-as="type" t-key="type.id" type="button"
+                        t-attf-class="o_checkinme_tile {{ type.id === c.type_id ? 'active' : '' }}" t-on-click="() => this.chooseType(type)">
+                    <i t-attf-class="fa {{ type.icon }}"/>
+                    <span t-esc="type.name"/>
+                </button>
+            </div>
+
+            <section class="o_checkinme_card">
+                <label class="o_checkinme_label">Purpose</label>
+                <input type="text" class="form-control mb-3" placeholder="e.g. Present the new price list" t-model="c.purpose"/>
+                <label class="o_checkinme_label">Notes</label>
+                <textarea class="form-control mb-3" rows="3" placeholder="What was discussed? Needs, objections, agreements..." t-model="c.notes"/>
+                <label class="o_checkinme_label">Photo</label>
+                <div t-if="c.photoPreview" class="o_checkinme_photo">
+                    <img t-att-src="c.photoPreview" alt="Photo"/>
+                    <button type="button" class="btn btn-sm btn-light" t-on-click="removePhoto"><i class="fa fa-trash"/></button>
+                </div>
+                <label t-else="" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mb-0">
+                    <i class="fa fa-camera me-2"/>Take a photo
+                    <input type="file" accept="image/*" capture="environment" class="d-none" t-on-change="onPhotoChange"/>
+                </label>
+            </section>
+
+            <div class="o_checkinme_muted mb-2" t-if="hasPosition"><i class="fa fa-map-marker me-1"/>Position <t t-esc="formatCoord(state.geo.latitude)"/>, <t t-esc="formatCoord(state.geo.longitude)"/> (&#177;<t t-esc="state.geo.accuracy"/> m)</div>
+            <button type="button" class="btn btn-primary o_checkinme_btn_xl w-100" t-on-click="submitCheckin" t-att-disabled="!canSubmitCheckin">
+                <i t-if="state.busy" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-map-marker me-2"/>Check In
+            </button>
+        </t>
+    </t>
+
+    <!-- ============================ CHECK-OUT ============================ -->
+    <t t-name="checkinme_sales_activity.ScreenCheckout">
+        <t t-set="co" t-value="state.checkout"/>
+        <section class="o_checkinme_card">
+            <div class="o_checkinme_visit_name" t-esc="co.visit.partner_name or co.visit.type_name"/>
+            <div class="o_checkinme_muted"><t t-esc="co.visit.name"/> &#183; <t t-esc="co.visit.type_name"/> &#183; since <t t-esc="co.visit.checkin_time_local"/></div>
+            <div class="o_checkinme_muted mt-1">
+                <t t-if="state.geo.status === 'locating'"><i class="fa fa-crosshairs fa-spin me-1"/>Capturing your position...</t>
+                <t t-elif="state.geo.status === 'ok'"><i class="fa fa-map-marker me-1 text-success"/>Check-out position captured (&#177;<t t-esc="state.geo.accuracy"/> m)</t>
+                <t t-else=""><i class="fa fa-exclamation-circle me-1 text-warning"/>No check-out position. <a href="#" t-on-click.prevent="captureGps">Retry</a></t>
+            </div>
+        </section>
+
+        <div class="o_checkinme_section_label">Outcome</div>
+        <div class="o_checkinme_tiles o_checkinme_tiles_outcome">
+            <button t-foreach="state.dashboard.outcomes" t-as="outcome" t-key="outcome.value" type="button"
+                    t-attf-class="o_checkinme_tile {{ outcome.value === co.outcome ? 'active' : '' }}" t-on-click="() => this.chooseOutcome(outcome.value)">
+                <i t-attf-class="fa {{ outcome.value === 'order' ? 'fa-shopping-cart' : outcome.value === 'interested' ? 'fa-thumbs-o-up' : outcome.value === 'follow_up' ? 'fa-calendar-check-o' : outcome.value === 'not_interested' ? 'fa-thumbs-o-down' : 'fa-user-times' }}"/>
+                <span t-esc="outcome.label"/>
+            </button>
+        </div>
+
+        <section class="o_checkinme_card">
+            <label class="o_checkinme_label">Sales amount (<t t-esc="state.dashboard.currency_symbol"/>)</label>
+            <input type="number" inputmode="decimal" min="0" step="0.01" class="form-control mb-3" placeholder="0.00" t-model="co.sale_amount"/>
+            <label class="o_checkinme_label">Follow-up date</label>
+            <input type="date" class="form-control mb-3" t-model="co.next_action_date"/>
+            <label class="o_checkinme_label">Notes</label>
+            <textarea class="form-control" rows="3" placeholder="What was discussed? Needs, objections, agreements..." t-model="co.notes"/>
+        </section>
+
+        <button type="button" class="btn btn-primary o_checkinme_btn_xl w-100" t-on-click="submitCheckout" t-att-disabled="state.busy or state.geo.status === 'locating'">
+            <i t-if="state.busy" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-flag-checkered me-2"/>Check Out
+        </button>
+    </t>
+
+    <!-- ============================ RESULT ============================ -->
+    <t t-name="checkinme_sales_activity.ScreenResult">
+        <t t-set="r" t-value="state.result"/>
+        <section class="o_checkinme_card text-center">
+            <div t-attf-class="o_checkinme_geo_icon {{ r.location_status === 'verified' ? 'text-success' : 'text-primary' }}">
+                <i t-attf-class="fa {{ state.resultKind === 'checkout' ? 'fa-flag-checkered' : 'fa-check-circle' }}"/>
+            </div>
+            <div class="o_checkinme_visit_name">
+                <t t-if="state.resultKind === 'checkout'">Checked out</t>
+                <t t-elif="state.resultKind === 'checkin'">Checked in</t>
+                <t t-else="" t-esc="r.state_label"/>
+            </div>
+            <div class="o_checkinme_muted" t-esc="r.name"/>
+            <div class="mt-3 o_checkinme_list_title" t-esc="r.partner_name or r.type_name"/>
+            <div class="o_checkinme_muted"><t t-esc="r.type_name"/> &#183; <t t-esc="r.checkin_date_local"/> <t t-esc="r.checkin_time_local"/><t t-if="r.checkout_time_local"> &#8594; <t t-esc="r.checkout_time_local"/></t></div>
+            <div class="mt-3">
+                <span t-attf-class="o_checkinme_badge o_checkinme_badge_{{ r.location_status }}">
+                    <t t-esc="r.location_status_label"/>
+                    <t t-if="r.location_status === 'verified' or r.location_status === 'far'"> (<t t-esc="formatDistance(r.distance_to_partner)"/>)</t>
+                </span>
+            </div>
+            <div class="o_checkinme_muted mt-2">
+                <t t-if="r.telegram_pending"><i class="fa fa-paper-plane me-1"/>Telegram notification queued</t>
+                <t t-elif="r.telegram_notified"><i class="fa fa-paper-plane me-1 text-success"/>Managers notified on Telegram</t>
+            </div>
+            <a t-if="r.google_maps_url" t-att-href="r.google_maps_url" target="_blank" rel="noopener" class="btn btn-link"><i class="fa fa-map me-1"/>Open in Google Maps</a>
+        </section>
+        <div class="o_checkinme_row">
+            <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="() => this.openRecord(r.id)"><i class="fa fa-pencil me-2"/>Edit</button>
+            <button t-if="r.state === 'checked_in'" type="button" class="btn btn-outline-primary o_checkinme_btn_lg" t-on-click="() => this.startCheckout(r)"><i class="fa fa-flag-checkered me-2"/>Check Out</button>
+            <button type="button" class="btn btn-primary o_checkinme_btn_lg flex-grow-1" t-on-click="goHome"><i class="fa fa-home me-2"/>Done</button>
+        </div>
+    </t>
+
+    <!-- ============================ HISTORY ============================ -->
+    <t t-name="checkinme_sales_activity.ScreenHistory">
+        <section class="o_checkinme_card">
+            <div class="o_checkinme_card_title"><i class="fa fa-history me-2"/>Recent visits</div>
+            <div t-if="!state.history.length" class="o_checkinme_muted">No visit yet.</div>
+            <div t-foreach="state.history" t-as="visit" t-key="visit.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.openVisit(visit.id)">
+                <div class="o_checkinme_list_time"><div t-esc="visit.checkin_date_local"/><div class="o_checkinme_muted" t-esc="visit.checkin_time_local"/></div>
+                <div class="o_checkinme_list_main">
+                    <div class="o_checkinme_list_title" t-esc="visit.partner_name or visit.type_name"/>
+                    <div class="o_checkinme_muted"><t t-esc="visit.type_name"/> &#183; <t t-esc="visit.state_label"/><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
+                </div>
+                <span t-attf-class="o_checkinme_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
+            </div>
+        </section>
+    </t>
+
+</templates>

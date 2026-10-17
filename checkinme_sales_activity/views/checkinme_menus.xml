@@ -8,6 +8,18 @@
               web_icon="checkinme_sales_activity,static/description/icon.png"
               groups="checkinme_sales_activity.group_checkinme_user"/>
 
+    <!-- Phone-first entry points (same pattern as a quick-order screen): the screen is the first menu -->
+    <menuitem id="menu_checkinme_screen"
+              name="Check In"
+              parent="menu_checkinme_root"
+              action="action_checkinme_screen"
+              sequence="1"/>
+    <menuitem id="menu_checkinme_install"
+              name="Install on phone"
+              parent="menu_checkinme_root"
+              action="action_checkinme_install"
+              sequence="90"/>
+
     <!-- Check-ins -->
     <menuitem id="menu_checkinme_checkins"
               name="Check-ins"

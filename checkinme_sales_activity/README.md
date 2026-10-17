@@ -21,7 +21,7 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
 1. Copy `checkinme_sales_activity` into your addons path.
 2. Update the apps list and install **CheckinMe Sales Activity**.
 3. Give users one of the two access levels (Settings > Users > *CheckinMe Sales Activity*):
-   * **Salesperson** - creates and edits own check-ins (planned visits may be deleted), reads the check-ins, targets and reports of direct reports.
+   * **Salesperson** - creates and edits own check-ins (planned visits may be deleted), creates customers from the phone screen (the group implies Odoo's *Contact Creation* right), reads the check-ins, targets and reports of direct reports.
    * **Manager** - full access, targets, activity types, Telegram settings and logs.
 4. Make sure every salesperson has an **Employee** record linked to their user (Employees app). Check-ins, targets and reports are attached to the employee; the employee's timezone is used to compute the check-in day.
 
@@ -52,6 +52,19 @@ If another Telegram module already stores a bot token under `send_by_telegram.bo
 
 * **Sales results source**: measure sales against targets from confirmed sales orders of the salesperson (default) or from the *Sales Amount* entered on check-ins.
 
+## Phone screen (CheckinMe > Check In)
+
+The first menu of the app is a dedicated phone screen, built the same way as a quick-order screen: a single page that walks the salesperson through the day without ever opening a backend form.
+
+1. **Home**: today's visits / verified / customers counters, the month's targets with progress bars, the currently open visit with a big **Check Out** button, the planned visits with **Check In** buttons, and **Check In Now**.
+2. **Check in** in three taps: the position is captured automatically (retry if needed), then the customer is picked from *Customers near you* (sorted by distance from the phone's position), *Recently visited* or a search by name / phone, or created on the spot (the phone's position becomes the customer's geolocation), then the activity type is chosen from large tiles, with purpose, notes and a photo from the camera.
+3. **Check out** with the outcome tiles, sales amount, follow-up date and notes; the check-out position is captured again.
+4. **Result** card with the reference, the verification badge (distance to the customer), the Telegram status and a Google Maps link; **My visits** lists the recent history.
+
+Every tap writes a real record through the regular ORM methods, so access rights, GPS verification and Telegram notifications are exactly the same as in the backend views. The screen's code is loaded on demand (asset bundle `checkinme_sales_activity.assets_screen`), so the rest of Odoo is not slowed down.
+
+**Install on phone**: *CheckinMe > Install on phone* opens Odoo's scoped-app page; on Android (Chrome) and iOS (Safari, *Add to Home Screen*) it installs the screen as a standalone app with the CheckinMe icon, just like the Barcode app. From the backend, *Actions > Open in phone screen* on any check-in opens it in the screen.
+
 ## Using it on a phone
 
 1. Open Odoo in the phone browser or the Odoo mobile app and go to **CheckinMe > Check-ins > Check In Now**.
@@ -77,6 +90,7 @@ If another Telegram module already stores a bot token under `send_by_telegram.bo
 | `checkinme.performance.report` | SQL report (inlined `_table_query`) combining check-ins and confirmed sales orders per employee and day. |
 | `checkinme.telegram` | Telegram Bot API service (`sendMessage`, `sendLocation`, `sendPhoto`, `getMe`), message formatting, scheduled reports. Never raises towards the user; every call is logged in `checkinme.telegram.log`. |
 | `checkinme.report.wizard` | Period / employee selection for the PDF report, analysis and Telegram sending. |
+| `checkinme.checkin` (`models/checkinme_mobile.py`) | `mobile_get_dashboard`, `mobile_search_customers`, `mobile_create_customer`, `mobile_checkin`, `mobile_checkout`, `mobile_get_history`: the RPC entry points of the phone screen (client action `checkinme_sales_activity.screen`). |
 
 System parameters: `checkinme.telegram_bot_token`, `checkinme.telegram_chat_id`, `checkinme.notify_checkin`, `checkinme.notify_checkout`, `checkinme.send_location_pin`, `checkinme.send_photo`, `checkinme.daily_report`, `checkinme.weekly_report`, `checkinme.monthly_report`, `checkinme.require_gps`, `checkinme.max_distance_m`, `checkinme.sales_source`.
 
