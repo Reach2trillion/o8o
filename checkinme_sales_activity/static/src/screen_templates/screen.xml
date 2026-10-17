@@ -75,21 +75,21 @@
             </div>
             <div t-if="d.target.sales.target" class="o_checkinme_progress_row">
                 <div class="d-flex justify-content-between"><span>Sales</span><span><t t-esc="d.target.sales.actual_display"/> / <t t-esc="d.target.sales.target_display"/></span></div>
-                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.sales.pct) }}%"/></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ pct(d.target.sales.pct) }}%"/></div>
             </div>
             <div t-if="d.target.visits.target" class="o_checkinme_progress_row">
                 <div class="d-flex justify-content-between"><span>Visits</span><span><t t-esc="d.target.visits.actual"/> / <t t-esc="d.target.visits.target"/></span></div>
-                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.visits.pct) }}%"/></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ pct(d.target.visits.pct) }}%"/></div>
             </div>
             <div t-if="d.target.new_customers.target" class="o_checkinme_progress_row">
                 <div class="d-flex justify-content-between"><span>New customers</span><span><t t-esc="d.target.new_customers.actual"/> / <t t-esc="d.target.new_customers.target"/></span></div>
-                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.new_customers.pct) }}%"/></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ pct(d.target.new_customers.pct) }}%"/></div>
             </div>
             <div t-if="d.target.orders.target" class="o_checkinme_progress_row">
                 <div class="d-flex justify-content-between"><span>Orders</span><span><t t-esc="d.target.orders.actual"/> / <t t-esc="d.target.orders.target"/></span></div>
-                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ Math.min(100, d.target.orders.pct) }}%"/></div>
+                <div class="o_checkinme_progress"><div class="o_checkinme_progress_bar" t-attf-style="width: {{ pct(d.target.orders.pct) }}%"/></div>
             </div>
-            <div class="o_checkinme_muted mt-2"><t t-esc="d.target.days_remaining"/> days left &#183; expected <t t-esc="Math.round(d.target.expected_progress)"/>% by today</div>
+            <div class="o_checkinme_muted mt-2"><t t-esc="d.target.days_remaining"/> days left &#183; expected <t t-esc="pct(d.target.expected_progress)"/>% by today</div>
         </section>
 
         <section t-if="d.planned_today.length" class="o_checkinme_card">
@@ -169,10 +169,10 @@
             </div>
             <section t-if="c.newCustomer.open" class="o_checkinme_card">
                 <div class="o_checkinme_card_title">New customer</div>
-                <input type="text" class="form-control mb-2" placeholder="Name *" t-model="c.newCustomer.name"/>
-                <input type="tel" class="form-control mb-2" placeholder="Phone" t-model="c.newCustomer.phone"/>
-                <input type="text" class="form-control mb-2" placeholder="Street" t-model="c.newCustomer.street"/>
-                <input type="text" class="form-control mb-2" placeholder="City" t-model="c.newCustomer.city"/>
+                <input type="text" class="form-control mb-2" placeholder="Name *" t-model="state.checkin.newCustomer.name"/>
+                <input type="tel" class="form-control mb-2" placeholder="Phone" t-model="state.checkin.newCustomer.phone"/>
+                <input type="text" class="form-control mb-2" placeholder="Street" t-model="state.checkin.newCustomer.street"/>
+                <input type="text" class="form-control mb-2" placeholder="City" t-model="state.checkin.newCustomer.city"/>
                 <div class="o_checkinme_muted mb-2" t-if="hasPosition"><i class="fa fa-map-marker me-1"/>Your current position will be saved as the customer's location.</div>
                 <button type="button" class="btn btn-primary o_checkinme_btn_lg w-100" t-on-click="createCustomer" t-att-disabled="state.busy">Create and select</button>
             </section>
@@ -220,9 +220,9 @@
 
             <section class="o_checkinme_card">
                 <label class="o_checkinme_label">Purpose</label>
-                <input type="text" class="form-control mb-3" placeholder="e.g. Present the new price list" t-model="c.purpose"/>
+                <input type="text" class="form-control mb-3" placeholder="e.g. Present the new price list" t-model="state.checkin.purpose"/>
                 <label class="o_checkinme_label">Notes</label>
-                <textarea class="form-control mb-3" rows="3" placeholder="What was discussed? Needs, objections, agreements..." t-model="c.notes"/>
+                <textarea class="form-control mb-3" rows="3" placeholder="What was discussed? Needs, objections, agreements..." t-model="state.checkin.notes"/>
                 <label class="o_checkinme_label">Photo</label>
                 <div t-if="c.photoPreview" class="o_checkinme_photo">
                     <img t-att-src="c.photoPreview" alt="Photo"/>
@@ -265,11 +265,11 @@
 
         <section class="o_checkinme_card">
             <label class="o_checkinme_label">Sales amount (<t t-esc="state.dashboard.currency_symbol"/>)</label>
-            <input type="number" inputmode="decimal" min="0" step="0.01" class="form-control mb-3" placeholder="0.00" t-model="co.sale_amount"/>
+            <input type="number" inputmode="decimal" min="0" step="0.01" class="form-control mb-3" placeholder="0.00" t-model="state.checkout.sale_amount"/>
             <label class="o_checkinme_label">Follow-up date</label>
-            <input type="date" class="form-control mb-3" t-model="co.next_action_date"/>
+            <input type="date" class="form-control mb-3" t-model="state.checkout.next_action_date"/>
             <label class="o_checkinme_label">Notes</label>
-            <textarea class="form-control" rows="3" placeholder="What was discussed? Needs, objections, agreements..." t-model="co.notes"/>
+            <textarea class="form-control" rows="3" placeholder="What was discussed? Needs, objections, agreements..." t-model="state.checkout.notes"/>
         </section>
 
         <button type="button" class="btn btn-primary o_checkinme_btn_xl w-100" t-on-click="submitCheckout" t-att-disabled="state.busy or state.geo.status === 'locating'">

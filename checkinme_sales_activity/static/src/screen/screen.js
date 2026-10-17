@@ -78,7 +78,7 @@ export class CheckinmeScreen extends Component {
     // ------------------------------------------------------------------
     // Getters
     // ------------------------------------------------------------------
-    get d() {
+    get dashboard() {
         return this.state.dashboard;
     }
 
@@ -102,11 +102,11 @@ export class CheckinmeScreen extends Component {
     }
 
     get requireGps() {
-        return Boolean(this.d && this.d.settings.require_gps);
+        return Boolean(this.dashboard && this.dashboard.settings.require_gps);
     }
 
     get selectedType() {
-        return (this.d?.types || []).find((t) => t.id === this.state.checkin.type_id) || null;
+        return (this.dashboard?.types || []).find((t) => t.id === this.state.checkin.type_id) || null;
     }
 
     get customerSections() {
@@ -121,7 +121,7 @@ export class CheckinmeScreen extends Component {
     }
 
     get openVisitElapsed() {
-        const visit = this.d?.open_visit;
+        const visit = this.dashboard?.open_visit;
         const start = visit && parseServerDatetime(visit.checkin_time);
         if (!start) {
             return "";
@@ -145,6 +145,11 @@ export class CheckinmeScreen extends Component {
 
     formatDistance(meters) {
         return formatDistance(meters);
+    }
+
+    /** Clamped, rounded percentage for progress bars (templates cannot use globals such as Math). */
+    pct(value) {
+        return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
     }
 
     formatCoord(value) {
@@ -237,7 +242,7 @@ export class CheckinmeScreen extends Component {
     // ------------------------------------------------------------------
     async startCheckin(planned = null) {
         this.state.checkin = this.emptyCheckin();
-        const types = this.d?.types || [];
+        const types = this.dashboard?.types || [];
         const preferred = types.find((t) => t.counts_as_visit) || types[0];
         this.state.checkin.type_id = preferred ? preferred.id : null;
         if (planned) {
