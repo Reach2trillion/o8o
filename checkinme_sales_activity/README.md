@@ -63,7 +63,91 @@ The first menu of the app is a dedicated phone screen, built the same way as a q
 
 Every tap writes a real record through the regular ORM methods, so access rights, GPS verification and Telegram notifications are exactly the same as in the backend views. The screen's code is loaded on demand (asset bundle `checkinme_sales_activity.assets_screen`), so the rest of Odoo is not slowed down.
 
-**Install on phone**: *Sale Check > Install on phone* opens Odoo's scoped-app page; on Android (Chrome) and iOS (Safari, *Add to Home Screen*) it installs the screen as a standalone app with the Sale Check icon, just like the Barcode app. From the backend, *Actions > Open in phone screen* on any check-in opens it in the screen.
+**Install on phone**: *Sale Check > Install on phone* installs the screen on the phone as the **ABJ** app (see [ABJ mobile app](#abj-mobile-app) below). The screen has a stable address, `/odoo/abj` (a visit: `/odoo/abj/<check-in id>`), and opens full screen. From the backend, *Actions > Open in phone screen* on any check-in opens it in the screen.
+
+## ABJ mobile app
+
+The phone screen is what the salespeople install on their phones, under the name **ABJ** (icon: the ABJ wordmark on slate). There is nothing to download from a store for iPhones and most Android phones: the app is the Odoo page `/odoo/abj` installed as a web app. An optional Android app (a thin shell around the same page) exists for the cases listed below.
+
+| | iPhone / iPad (iOS 16.4+) | Android, installed from Chrome | Android app "ABJ" (optional) |
+|---|---|---|---|
+| Install | Safari > Share > *Add to Home Screen* | Chrome > *Install* | APK built from [`mobile/`](../mobile/README.md) |
+| Notifications | Web Push (Apple) | Web Push (Google) | Firebase Cloud Messaging |
+| GPS and camera | Yes | Yes | Yes |
+| Receipt printing | System print (AirPrint) only | Bluetooth printer (Web Serial / Web Bluetooth), system print | Paired Bluetooth printer, network printer (port 9100), Android print |
+| Login | Odoo login | Odoo login (Google login works) | Odoo login and password only |
+
+### Install on an iPhone
+
+1. Open **Safari** (iOS 16.4 or later), log in to Odoo and open *Sale Check > Install on phone* (or go to `https://<your server>/scoped_app?app_id=checkinme_sales_activity&app_name=ABJ&path=odoo/abj`).
+2. On that install page, tap **Share** > **Add to Home Screen** > **Add**. The ABJ icon appears on the Home Screen. (Adding another Odoo page to the Home Screen installs the generic "Odoo" app instead.)
+3. Open **ABJ from the Home Screen** (not from Safari), tap the gear icon > *Notifications* > **Enable notifications** and allow them. iOS only delivers web notifications to apps added to the Home Screen; a Safari tab never receives them.
+
+### Install on Android
+
+1. Open **Chrome**, log in to Odoo and open *Sale Check > Install on phone*, then tap **Install** (or Chrome menu > *Add to Home screen* > *Install*).
+2. Open ABJ from the home screen, tap the gear icon > *Notifications* > **Enable notifications** and allow them.
+
+The installed app runs in Chrome, so everything Chrome offers works in it (Bluetooth printing through Web Serial / Web Bluetooth, Google login, downloads).
+
+### Optional Android app
+
+The Android app is a small native shell (Capacitor) that opens the same `/odoo/abj` page and adds what a web page cannot do on its own: printing to paired Bluetooth Classic printers without Chrome's pickers, network receipt printers (TCP port 9100), the Android print service, and native push notifications through Firebase. Use it if you distribute phones with an MDM / the Play Store, or if Web Serial printing does not work with your printers. Build and signing instructions, Firebase setup for the build and printer pairing are in [`mobile/README.md`](../mobile/README.md).
+
+* Google blocks its login page inside embedded WebViews, so **"Sign in with Google" does not work in the Android app**: give the salespeople an Odoo password (or use the Chrome-installed app).
+* A phone that has **both** the Chrome-installed ABJ and the Android app receives every notification twice: keep only one of them.
+
+### Notifications
+
+| Notification | When | Who | Setting (Settings > Sale Check > ABJ Mobile App) |
+|---|---|---|---|
+| New visit planned | Someone else plans a visit for the salesperson, or assigns a planned visit to them | The salesperson | *Planned Visit Notifications* (on) |
+| N follow-ups today | Every morning, for the visits whose follow-up date is today | The salesperson | *Morning Follow-up Reminders* (on) |
+| Check-in / check-out | Each check-in / check-out of a team member | Their manager and department manager, if they may open the visit | *Team Check-in Notifications* (off: Telegram already covers the managers) |
+| Odoo messages | Mentions, direct messages, assigned activities | The recipients | *Odoo Messages in the Android App* (on; browsers and the installed web app get them from Odoo itself) |
+
+Tapping a notification opens the visit in ABJ (`/odoo/abj/<id>`). Notifications are queued (`checkinme.push.message`) and sent by the scheduled action *Sale Check: Send Queued ABJ Push Notifications* right after the record is saved (and hourly as a safety net), so a slow push service never delays the salesperson. Each one is logged with the number of devices reached and the errors returned by the push services in *Sale Check > Reporting > Push Logs*; expired browser subscriptions are removed and dead Android app tokens are archived automatically. Phones running the Android app are listed in *Sale Check > Configuration > ABJ App Devices* (archive a lost phone there).
+
+To check a phone, use **Send a test notification to me** in the settings, or *Send test notification* in the app's settings screen.
+
+The morning reminder runs at 01:00 UTC (08:00 in Phnom Penh). For another timezone, change *Next Execution Date* of *Sale Check: ABJ Follow-up Reminders* in *Settings > Technical > Scheduled Actions*.
+
+### Printing receipts
+
+From the result of a visit or *My visits*, **Print slip** prints the visit slip (customer, times, location check, outcome, follow-up, notes, a QR code to the location) and **Print &lt;order&gt;** prints a quotation / sales order taken during the visit. The receipt is drawn on the phone as an image, because the text mode of receipt printers (ESC/POS) cannot print Khmer; any 58 mm (384 dots) or 80 mm (576 dots) ESC/POS thermal printer that supports raster images works.
+
+Set the printer once per phone in ABJ > gear icon > *Printer* (connection, **Choose printer**, paper width 58 / 80 mm, cutter, automatic printing after check-out) and use **Print test page**. Only the connections available on the phone are offered.
+
+* **Android, installed from Chrome**: pair the printer first in Android *Settings > Bluetooth*, then choose the Bluetooth serial connection (Web Serial, Chrome 138 or later; allow Chrome the *Nearby devices* permission). Printers that only speak Bluetooth Low Energy use the Bluetooth LE connection; Chrome asks to pick the printer again after each restart of the app. System print uses the Android print services (Mopria, *Save as PDF*).
+* **iPhone**: Safari cannot talk to Bluetooth printers. Only system print (AirPrint printers, or *Save to Files*) is available.
+* **Android app**: pair the printer in Android settings, then choose the Bluetooth connection and pick the printer from the paired devices; network receipt printers use the network connection with the printer's IP address and port 9100; system print uses the Android print services.
+
+### Firebase (Android app notifications only)
+
+The web app needs no setup: Odoo's mail module creates its Web Push keys the first time a user enables notifications. For the Android app:
+
+1. In the [Firebase console](https://console.firebase.google.com/), create a project and add an Android app with the application id of the build (`com.abj.app` by default). Its `google-services.json` is used by the build only (see [`mobile/README.md`](../mobile/README.md)); never upload it to Odoo.
+2. *Project settings > Service accounts > Generate new private key* downloads a JSON key.
+3. In Odoo, *Settings > Sale Check > ABJ Mobile App > Android App Notifications (Firebase)*: upload this JSON key and save. The project and the service account are then displayed; the key itself is never shown again (it is stored in the system parameter `checkinme.fcm_service_account`, readable by administrators only).
+4. Click **Send a test notification to me** with the Android app installed and logged in.
+
+To rotate the key, upload the new one, then delete the old key in the Google Cloud console (*IAM > Service accounts > Keys*).
+
+### Deployment checklist
+
+* Odoo is self-hosted or on Odoo.sh: custom modules cannot be installed on Odoo Online.
+* Public **HTTPS** address: set `web.base.url` to `https://...` and add the system parameter `web.base.url.freeze` = `True` (Apple refuses Web Push from a server that does not identify itself with an https URL, and notification links are built on it). Behind a reverse proxy, start Odoo with `proxy_mode = True`.
+* Outbound HTTPS from the Odoo server to `*.push.apple.com` (iPhones), `fcm.googleapis.com` (Chrome on Android and the Android app) and `oauth2.googleapis.com` (Android app).
+* At least one cron worker (`max_cron_threads >= 1`, the default): notifications and reminders are sent by scheduled actions.
+* **Never delete the system parameters `mail.web_push_vapid_private_key` / `mail.web_push_vapid_public_key`**: every phone would silently stop receiving notifications until its user enables them again.
+
+### Known limitations
+
+* iPhones need iOS 16.4 or later and the Home Screen app; removing the app or clearing Safari data removes the subscription (enable notifications again).
+* Not verified on a real iPhone: opening the visit when a notification is tapped (the app may open on its home page instead) and printing from the Home Screen app (if the print dialog does not open, the receipt image opens in a new page to print or share it).
+* Bluetooth printing from Chrome (Web Serial over Bluetooth, Chrome 138+) was checked against the specifications and Chrome's source code, not with every printer model: cheap printers differ, test yours with *Print test page*. Printers that only speak Bluetooth LE must be picked again after each restart.
+* Push services keep an undelivered notification for a limited time (24 hours, 12 hours for the morning reminder, 4 hours for team check-ins, 1 hour for tests): a phone switched off longer does not get it. Battery savers may delay notifications.
+* Odoo's own notifications to browsers and the installed web app (chat, mentions) are unchanged: they come from the mail module.
 
 ## Using it on a phone
 
@@ -90,9 +174,14 @@ Every tap writes a real record through the regular ORM methods, so access rights
 | `checkinme.performance.report` | SQL report (inlined `_table_query`) combining check-ins and confirmed sales orders per employee and day. |
 | `checkinme.telegram` | Telegram Bot API service (`sendMessage`, `sendLocation`, `sendPhoto`, `getMe`), message formatting, scheduled reports. Never raises towards the user; every call is logged in `checkinme.telegram.log`. |
 | `checkinme.report.wizard` | Period / employee selection for the PDF report, analysis and Telegram sending. |
-| `checkinme.checkin` (`models/checkinme_mobile.py`) | `mobile_get_dashboard`, `mobile_search_customers`, `mobile_create_customer`, `mobile_checkin`, `mobile_checkout`, `mobile_get_history`: the RPC entry points of the phone screen (client action `checkinme_sales_activity.screen`). |
+| `checkinme.checkin` (`models/checkinme_mobile.py`) | `mobile_get_dashboard`, `mobile_search_customers`, `mobile_create_customer`, `mobile_checkin`, `mobile_checkout`, `mobile_get_history`, `mobile_get_receipt`, `mobile_send_test_push`: the RPC entry points of the phone screen (client action `checkinme_sales_activity.screen`, path `abj`). |
+| `checkinme.push` | Push notification service: `_notify(users, title, body, url, event, record)` queues a notification (never raises, nothing queued without a device), `_cron_send_push_queue` sends it by Web Push (`tools/web_push.py`, mail's VAPID keys and browser subscriptions, with a real TTL and high urgency) and FCM HTTP v1 (`tools/fcm.py`, OAuth2 service-account flow without extra dependency). |
+| `checkinme.push.message` | Queue and log of the notifications (kept 30 days). |
+| `checkinme.push.device` | Firebase registration tokens of the Android app (`register_device` / `unregister_device`, called by the app). |
+| `mail.thread` (`models/mail_thread.py`) | Copies Odoo's own web push notifications to the Android app devices. |
+| `controllers/webmanifest.py` | ABJ name, colors and PNG icons in the scoped app manifest (`/web/manifest.scoped_app_manifest?app_id=checkinme_sales_activity`), the iOS Home Screen icon, and the ABJ service worker snippet (`static/src/sw/abj_service_worker.js`) prepended to `/web/service-worker.js`. |
 
-System parameters: `checkinme.telegram_bot_token`, `checkinme.telegram_chat_id`, `checkinme.notify_checkin`, `checkinme.notify_checkout`, `checkinme.send_location_pin`, `checkinme.send_photo`, `checkinme.daily_report`, `checkinme.weekly_report`, `checkinme.monthly_report`, `checkinme.require_gps`, `checkinme.max_distance_m`, `checkinme.sales_source`.
+System parameters: `checkinme.telegram_bot_token`, `checkinme.telegram_chat_id`, `checkinme.notify_checkin`, `checkinme.notify_checkout`, `checkinme.send_location_pin`, `checkinme.send_photo`, `checkinme.daily_report`, `checkinme.weekly_report`, `checkinme.monthly_report`, `checkinme.require_gps`, `checkinme.max_distance_m`, `checkinme.sales_source`, `checkinme.push_planned_visit`, `checkinme.push_followup_reminder`, `checkinme.push_team_checkin`, `checkinme.push_odoo_messages`, `checkinme.fcm_service_account`.
 
 Extensions: `hr.employee` (Telegram chat id, smart buttons), `res.partner` (visit count, last visit, smart button), `sale.order` (`checkinme_checkin_id`).
 
@@ -104,7 +193,7 @@ The GPS capture is an OWL field widget (`checkinme_geolocation`) using the brows
 odoo-bin -d <db> -i checkinme_sales_activity --test-enable --test-tags /checkinme_sales_activity --stop-after-init
 ```
 
-All Telegram HTTP calls are mocked in the test suite.
+All Telegram, Web Push, Google OAuth and FCM HTTP calls are mocked in the test suite (the Web Push payloads are decrypted and the signed tokens verified with throwaway keys). The ABJ web app tests (`test_abj_controllers.py`) use `HttpCase` and need Chrome / Chromium for the browser test.
 
 ## License
 

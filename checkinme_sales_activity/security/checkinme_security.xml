@@ -80,6 +80,14 @@
             <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
         </record>
 
+        <!-- ABJ push logs -->
+        <record id="checkinme_push_message_rule_company" model="ir.rule">
+            <field name="name">ABJ push log: multi-company</field>
+            <field name="model_id" ref="model_checkinme_push_message"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
+        </record>
+
         <!-- Performance report (SQL view) -->
         <record id="checkinme_performance_report_rule_user" model="ir.rule">
             <field name="name">Performance report: own and direct reports</field>

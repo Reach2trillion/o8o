@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!-- Phone screen: a dedicated OWL client action (JS / CSS in the lazy bundle checkinme_sales_activity.assets_screen) -->
+    <!-- Stable URL /odoo/abj (and /odoo/abj/<check-in id>), full screen like a barcode interface:
+         this is the start page of the installed ABJ app -->
     <record id="action_checkinme_screen" model="ir.actions.client">
-        <field name="name">Sale Check</field>
+        <field name="name">ABJ</field>
         <field name="tag">checkinme_sales_activity.screen</field>
-        <field name="target">current</field>
+        <field name="path">abj</field>
+        <field name="target">fullscreen</field>
     </record>
 
-    <!-- "Install on phone": Odoo's scoped-app page installs the screen as a standalone app (PWA) -->
+    <!-- "Install on phone": Odoo's scoped-app page installs the screen as the standalone ABJ app (PWA);
+         its manifest, icons and service worker additions come from controllers/webmanifest.py -->
     <record id="action_checkinme_install" model="ir.actions.act_url">
         <field name="name">Install on phone</field>
-        <field name="url">/scoped_app?app_id=checkinme_sales_activity&amp;app_name=Sale%20Check&amp;path=odoo/action-checkinme_sales_activity.action_checkinme_screen</field>
+        <field name="url">/scoped_app?app_id=checkinme_sales_activity&amp;app_name=ABJ&amp;path=odoo/abj</field>
         <field name="target">self</field>
     </record>
 
@@ -24,12 +28,8 @@
         <field name="state">code</field>
         <field name="code">
 record = records[:1]
-action = {
-    'type': 'ir.actions.client',
-    'tag': 'checkinme_sales_activity.screen',
-    'target': 'current',
-    'context': {'checkinme_open_id': record.id if record else False},
-}
+action = env['ir.actions.actions']._for_xml_id('checkinme_sales_activity.action_checkinme_screen')
+action['context'] = {'checkinme_open_id': record.id if record else False}
         </field>
     </record>
 </odoo>

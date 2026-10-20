@@ -9,3 +9,6 @@ access_checkinme_telegram_log_manager,checkinme.telegram.log manager,model_check
 access_checkinme_performance_report_user,checkinme.performance.report user,model_checkinme_performance_report,group_checkinme_user,1,0,0,0
 access_checkinme_performance_report_manager,checkinme.performance.report manager,model_checkinme_performance_report,group_checkinme_manager,1,0,0,0
 access_checkinme_report_wizard_user,checkinme.report.wizard user,model_checkinme_report_wizard,group_checkinme_user,1,1,1,1
+access_checkinme_push_device_manager,checkinme.push.device manager,model_checkinme_push_device,group_checkinme_manager,1,1,0,1
+access_checkinme_push_device_system,checkinme.push.device system,model_checkinme_push_device,base.group_system,1,1,1,1
+access_checkinme_push_message_manager,checkinme.push.message manager,model_checkinme_push_message,group_checkinme_manager,1,0,0,1
