@@ -13,6 +13,7 @@ const DEVICE_MODEL = "mail.push.device";
 // same key as the mail module (mail/static/src/webclient/web/webclient.js)
 const ENDPOINT_KEY = `${DEVICE_MODEL}_endpoint`;
 const SW_SCOPE = "/odoo";
+const UNREGISTER_TIMEOUT_MS = 5000;
 
 /** base64url (VAPID public key) -> bytes */
 export function b64urlToUint8(value) {
@@ -143,7 +144,7 @@ export async function enableWebPush(orm, prefetched) {
         subscription = await subscribe(registration, b64urlToUint8(vapidKey));
     }
     const kwargs = subscription.toJSON();
-    const previousEndpoint = readEndpoint();
+    const previousEndpoint = readPushEndpoint();
     if (previousEndpoint && previousEndpoint !== subscription.endpoint) {
         kwargs.previousEndpoint = previousEndpoint;
     }
@@ -158,10 +159,32 @@ export async function enableWebPush(orm, prefetched) {
     return "granted";
 }
 
-function readEndpoint() {
+/** Web push endpoint of this browser as registered on the server (null when unknown). */
+export function readPushEndpoint() {
     try {
         return browser.localStorage.getItem(ENDPOINT_KEY);
     } catch {
         return null;
+    }
+}
+
+/**
+ * Logout: remove this browser's ``mail.push.device`` so the server stops sending to it. The
+ * browser subscription is kept: mail registers it again for whoever logs in next (no new
+ * permission prompt). Never takes more than UNREGISTER_TIMEOUT_MS.
+ */
+export async function unregisterWebPush(orm) {
+    const endpoint = readPushEndpoint();
+    if (!endpoint) {
+        return;
+    }
+    let timer;
+    const timeout = new Promise((resolve, reject) => {
+        timer = browser.setTimeout(() => reject(new Error("unregister_devices timed out")), UNREGISTER_TIMEOUT_MS);
+    });
+    try {
+        await Promise.race([orm.call(DEVICE_MODEL, "unregister_devices", [], { endpoint }), timeout]);
+    } finally {
+        browser.clearTimeout(timer);
     }
 }

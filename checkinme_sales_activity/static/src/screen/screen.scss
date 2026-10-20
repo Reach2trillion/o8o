@@ -125,9 +125,12 @@ $abj-serif: 'Playfair Display', 'Noto Serif', 'DejaVu Serif', Georgia, serif;
         border-top: 1px solid $abj-line-soft;
         &:first-of-type { border-top: 0; }
     }
+    .o_checkinme_list_item > .btn { flex: 0 0 auto; white-space: nowrap; }
     .o_checkinme_clickable { cursor: pointer; &:active { background: $abj-cream; } }
     .o_checkinme_list_main { flex: 1 1 auto; min-width: 0; }
-    .o_checkinme_list_title { font-weight: 700; color: $abj-slate; overflow: hidden; text-overflow: ellipsis; }
+    .o_checkinme_list_title { font-weight: 700; color: $abj-slate; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
+    // status badge under the text of a row (beside it, the text column gets too narrow on 360 px phones)
+    .o_abj_row_badge { margin-top: 0.3rem; max-width: 100%; white-space: normal; border-radius: 10px; vertical-align: top; }
     .o_checkinme_list_time { flex: 0 0 auto; min-width: 3rem; font-weight: 700; color: $abj-taupe; font-size: 0.85rem; }
 
     .o_checkinme_steps {
@@ -191,6 +194,12 @@ $abj-serif: 'Playfair Display', 'Noto Serif', 'DejaVu Serif', Georgia, serif;
     .o_abj_option_text { display: flex; flex-direction: column; min-width: 0; }
     .o_abj_option_label { font-weight: 700; color: $abj-slate; }
     .o_abj_selected { background: $abj-taupe-tint; }
+    // paired printer rows are buttons (keyboard / switch access)
+    .o_abj_device {
+        width: 100%; border: 0; border-top: 1px solid $abj-line-soft; background: transparent; color: inherit; font: inherit; text-align: left;
+        &.o_abj_selected { background: $abj-taupe-tint; }
+        &:focus-visible { outline: 2px solid $abj-taupe; outline-offset: -2px; }
+    }
 
     .o_abj_segmented {
         display: flex; gap: 0.5rem;
