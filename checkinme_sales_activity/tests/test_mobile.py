@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests of the RPC helpers behind the phone screen."""
+import babel.dates
 
+from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import new_test_user, tagged
 
@@ -136,6 +138,71 @@ class TestMobileScreen(CheckinmeCommon):
         self.assertEqual(planned.notes, 'arrived')
         self.assertEqual(planned.location_status, 'verified')
         self.assertEqual(self.env['checkinme.checkin'].search_count([('employee_id', '=', self.rep_employee.id)]), 1)
+
+    def test_only_own_visits_can_be_checked_in_or_out(self):
+        """C1 / requirements-manager-opens-checkout: a manager opening a teammate's visit (team
+        push, shared link) sees it read-only and cannot check it in or out."""
+        visit = self._create_checkin(self.rep)
+        planned = self._create_checkin(self.rep, state='draft', latitude=0.0, longitude=0.0)
+        Rep = self._rep_checkin_model()
+        Manager = self.env['checkinme.checkin'].with_user(self.manager).with_context(**MAIL_CONTEXT)
+        vals = Rep.mobile_get_checkin(visit.id)
+        self.assertTrue(vals['is_mine'])
+        self.assertEqual((vals['employee_id'], vals['employee_name']), (self.rep_employee.id, 'Sok Dara'))
+        vals = Manager.mobile_get_checkin(visit.id)
+        self.assertFalse(vals['is_mine'])
+        self.assertEqual(vals['employee_name'], 'Sok Dara')
+        with self.assertRaisesRegex(UserError, 'your own visits'):
+            Manager.mobile_checkout(visit.id, {'latitude': CHECKIN_LAT, 'longitude': CHECKIN_LNG})
+        self.assertEqual(visit.state, 'checked_in')
+        self.assertFalse(visit.checkout_latitude)
+        with self.assertRaisesRegex(UserError, 'your own visits'):
+            Manager.mobile_checkin({'planned_id': planned.id, 'partner_id': self.partner_geo.id,
+                                    'latitude': CHECKIN_LAT, 'longitude': CHECKIN_LNG})
+        self.assertEqual(planned.state, 'draft')
+        self.assertEqual(self.env['checkinme.checkin'].search_count([('employee_id', '=', self.manager_employee.id)]), 0)
+        # the salesperson does both
+        self.assertEqual(Rep.mobile_checkout(visit.id, {})['state'], 'done')
+        result = Rep.mobile_checkin({'planned_id': planned.id, 'type_id': self.type_visit.id,
+                                     'latitude': CHECKIN_LAT, 'longitude': CHECKIN_LNG})
+        self.assertEqual((result['id'], result['state'], result['is_mine']), (planned.id, 'checked_in', True))
+        # without an activity type: the default one
+        result = Rep.mobile_checkin({'partner_id': self.partner_geo.id, 'latitude': CHECKIN_LAT,
+                                     'longitude': CHECKIN_LNG})
+        self.assertEqual(result['type_id'], self.env['checkinme.checkin']._default_checkin_type_id().id)
+
+    def test_dashboard_followups_today(self):
+        """C2 / requirements-followup-reminder-dead-end: the reminder's customers are on Home."""
+        today = self._today()
+        due = self._create_checkin(self.rep, next_action_date=today)
+        due.action_check_out()
+        later = self._create_checkin(self.rep, partner_id=self.partner_nogeo.id)
+        later.write({'next_action_date': fields.Date.add(today, days=1)})
+        later.action_check_out()
+        still_open = self._create_checkin(self.rep, next_action_date=today)
+        other = self._create_checkin(self.other_rep, next_action_date=today)
+        other.action_check_out()
+        data = self._rep_checkin_model().mobile_get_dashboard()
+        self.assertEqual([f['id'] for f in data['followups_today']], [due.id])
+        self.assertEqual(data['followups_today'][0]['partner_name'], self.partner_geo.display_name)
+        self.assertEqual(data['followups_today'][0]['next_action_date'], fields.Date.to_string(today))
+        self.assertNotIn(still_open.id, [f['id'] for f in data['followups_today']])
+
+    def test_dates_in_the_user_language(self):
+        """C5 / requirements-untranslatable-dates-strings: month and day names follow the language."""
+        self.env['res.lang']._activate_lang('km_KH')
+        visit = self._create_checkin(self.rep)
+        Checkin = self._rep_checkin_model()
+        today = self._today()
+        english = Checkin.with_context(lang='en_US').mobile_get_dashboard()
+        self.assertEqual(english['today_label'], today.strftime('%A %d %B %Y'))
+        self.assertEqual(english['open_visit']['checkin_date_local'],
+                         visit._to_local(visit.checkin_time).strftime('%d %b %Y'))
+        khmer = Checkin.with_context(lang='km_KH').mobile_get_dashboard()
+        self.assertEqual(khmer['today_label'], babel.dates.format_date(today, 'EEEE dd MMMM y', locale='km_KH'))
+        self.assertNotEqual(khmer['today_label'], english['today_label'])
+        self.assertEqual(khmer['open_visit']['checkin_date_local'], babel.dates.format_date(
+            visit._to_local(visit.checkin_time).date(), 'dd MMM y', locale='km_KH'))
 
     def test_history_and_get(self):
         Checkin = self._rep_checkin_model()

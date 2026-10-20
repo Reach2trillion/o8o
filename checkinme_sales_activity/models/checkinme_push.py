@@ -16,17 +16,18 @@ after the transaction is committed, so a slow push service never delays the sale
 import json
 import logging
 import threading
-from datetime import datetime, timedelta
+import time
+from datetime import timedelta
 
 import requests
 
 from odoo import api, fields, models, Command, _
 from odoo.exceptions import AccessError, UserError
+from odoo.tools.misc import format_datetime
 from odoo.addons.mail.tools.web_push import DeviceUnreachableError
 
 from ..tools.fcm import FcmClient, parse_service_account, should_deactivate
 from ..tools.web_push import send_web_push
-from .checkinme_checkin import safe_timezone
 
 _logger = logging.getLogger(__name__)
 
@@ -36,7 +37,16 @@ BADGE_URL = '/checkinme_sales_activity/static/img/abj-badge-96.png'
 FCM_PARAM = 'checkinme.fcm_service_account'
 FCM_CHANNEL_ID = 'abj_default'
 MAX_TOKEN_LENGTH = 4096
+MAX_ENDPOINT_LENGTH = 2048
 GC_DAYS = 30
+# Active Android app devices kept per user: older ones are archived when a new phone registers.
+MAX_DEVICES_PER_USER = 10
+# Characters of the message kept in the queue (a notification shows a few lines anyway).
+MAX_BODY_LENGTH = 1000
+# A message whose sending was interrupted (worker killed) this many times is given up.
+MAX_ATTEMPTS = 3
+# Seconds one run of the queue cron may spend sending before it hands over to the next run.
+QUEUE_TIME_BUDGET = 60
 
 PLATFORMS = [('android', 'Android'), ('ios', 'iOS')]
 
@@ -76,30 +86,46 @@ class CheckinmePushDevice(models.Model):
 
     user_id = fields.Many2one('res.users', string='User', required=True, index=True, ondelete='cascade')
     partner_id = fields.Many2one(related='user_id.partner_id', store=True, index=True)
-    token = fields.Char(string='Registration Token', required=True, copy=False)
+    token = fields.Char(string='Registration Token', required=True, copy=False, groups='base.group_system')
     platform = fields.Selection(PLATFORMS, string='Platform', default='android', required=True)
     device_name = fields.Char(string='Device')
     app_version = fields.Char(string='App Version')
     last_seen = fields.Datetime(string='Last Seen', default=fields.Datetime.now)
     active = fields.Boolean(default=True)
+    blocked = fields.Boolean(
+        string='Archived by a Manager', readonly=True, copy=False,
+        help="Archived from the backend (e.g. a lost phone): the app cannot reactivate it for the same "
+             "user. It is reactivated when it is unarchived, or when another user logs in on the phone.")
 
     _sql_constraints = [
         ('token_unique', 'unique(token)', 'This device is already registered.'),
     ]
 
-    @api.depends('device_name', 'token')
+    @api.depends('device_name')
     def _compute_display_name(self):
         for device in self:
-            device.display_name = device.device_name or (device.token or '')[:12]
+            device.display_name = device.device_name or (device.sudo().token or '')[:12]
+
+    def write(self, vals):
+        """From the backend, a device can only be archived or unarchived: the app registers it
+        (``register_device``) and nobody may redirect it to another user."""
+        if not self.env.su:
+            if set(vals) - {'active'}:
+                raise AccessError(_("App devices can only be archived or unarchived."))
+            if 'active' in vals:
+                vals = dict(vals, blocked=not vals['active'])
+        return super().write(vals)
 
     @api.model
     def register_device(self, token, platform='android', device_name='', app_version=''):
         """Called by the Android app after Firebase gave it a registration token. The token is
-        attached to the current user (a phone that changes hands moves to its new user)."""
+        attached to the current user (a phone that changes hands moves to its new user).
+
+        A phone archived by a manager stays archived for the same user (``blocked``)."""
         user = self.env.user
         if not user._is_internal():
             raise AccessError(_("Only internal users can receive ABJ app notifications."))
-        token = (token or '').strip()
+        token = (token or '').strip() if isinstance(token, str) else ''
         if not token or len(token) > MAX_TOKEN_LENGTH:
             raise UserError(_("Invalid push notification token."))
         vals = {
@@ -109,19 +135,28 @@ class CheckinmePushDevice(models.Model):
             'app_version': (app_version or '').strip()[:64] or False,
             'last_seen': fields.Datetime.now(),
             'active': True,
+            'blocked': False,
         }
         Device = self.sudo().with_context(active_test=False)
         device = Device.search([('token', '=', token)], limit=1)
-        if device:
+        if device and device.blocked and device.user_id == user:
+            device.write({key: vals[key] for key in ('platform', 'device_name', 'app_version', 'last_seen')})
+        elif device:
             device.write(vals)
         else:
             device = Device.create(dict(vals, token=token))
+        # keep the newest phones of the user only: one user cannot flood the push queue
+        active_devices = Device.search([('user_id', '=', user.id), ('active', '=', True)],
+                                       order='last_seen desc, id desc')
+        active_devices[MAX_DEVICES_PER_USER:].write({'active': False})
         return {'id': device.id, 'active': device.active}
 
     @api.model
     def unregister_device(self, token):
         """Called on logout: stop sending to this phone (only for the current user's token)."""
-        device = self.sudo().search([('token', '=', (token or '').strip()), ('user_id', '=', self.env.user.id)])
+        token = token.strip() if isinstance(token, str) else ''
+        device = self.sudo().search([('token', '=', token), ('user_id', '=', self.env.user.id)]) if token \
+            else self.browse()
         if device:
             device.active = False
         return True
@@ -151,6 +186,9 @@ class CheckinmePushMessage(models.Model):
     native_count = fields.Integer(string='Android App Devices', readonly=True)
     error = fields.Text(string='Error', readonly=True)
     sent_date = fields.Datetime(string='Sent On', readonly=True)
+    attempt_count = fields.Integer(
+        string='Attempts', readonly=True, copy=False,
+        help="Number of times the queue started sending this notification.")
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
     @api.autovacuum
@@ -162,8 +200,12 @@ class CheckinmePushMessage(models.Model):
     def action_retry(self):
         if not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager'):
             raise AccessError(_("Only Sale Check managers can resend notifications."))
-        self.sudo().write({'state': 'pending', 'error': False})
-        self.env['checkinme.push']._trigger_queue()
+        # the record rules (company, Odoo messages) apply to the ids given by the caller
+        self.check_access('read')
+        retry = self.filtered(lambda message: message.state in ('failed', 'partial'))
+        if retry:
+            retry.sudo().write({'state': 'pending', 'error': False, 'attempt_count': 0})
+            self.env['checkinme.push']._trigger_queue()
         return True
 
 
@@ -264,7 +306,7 @@ class CheckinmePush(models.AbstractModel):
                 company = record.sudo().company_id if record and 'company_id' in record._fields else False
                 message = Message.create({
                     'name': (title or '').strip() or 'ABJ',
-                    'body': (body or '').strip() or False,
+                    'body': (body or '').strip()[:MAX_BODY_LENGTH] or False,
                     'url': self._sanitize_url(url) or self._default_url(record),
                     'event': event if event in dict(PUSH_EVENTS) else 'other',
                     'user_ids': [Command.set(users.ids)],
@@ -285,12 +327,30 @@ class CheckinmePush(models.AbstractModel):
         """Send the queued notifications (oldest first). Triggered right after each event and
         swept hourly as a safety net."""
         Message = self.env['checkinme.push.message'].sudo()
-        pending = Message.search([('state', '=', 'pending')], order='id', limit=limit)
         auto_commit = not getattr(threading.current_thread(), 'testing', False)
+        # a message that killed the worker (cron time limit) MAX_ATTEMPTS times is given up
+        stuck = Message.search([('state', '=', 'pending'), ('attempt_count', '>=', MAX_ATTEMPTS)])
+        if stuck:
+            stuck.write({
+                'state': 'failed',
+                'error': _("Sending was interrupted %s times; the notification was given up.", MAX_ATTEMPTS),
+                'sent_date': fields.Datetime.now(),
+            })
+        pending = Message.search([('state', '=', 'pending'), ('attempt_count', '<', MAX_ATTEMPTS)],
+                                 order='id', limit=limit)
+        started = time.monotonic()
+        unsent = False
         if pending:
             session = self._get_http_session()
             try:
-                for message in pending:
+                for index, message in enumerate(pending):
+                    if index and time.monotonic() - started > QUEUE_TIME_BUDGET:
+                        unsent = True  # the next run sends the rest
+                        break
+                    # counted (and committed) before sending: a killed worker leaves a trace
+                    message.attempt_count += 1
+                    if auto_commit:
+                        self.env.cr.commit()
                     try:
                         with self.env.cr.savepoint():
                             self._send_message(message, session=session)
@@ -301,7 +361,7 @@ class CheckinmePush(models.AbstractModel):
                         self.env.cr.commit()
             finally:
                 session.close()
-        if len(pending) >= limit:
+        if unsent or len(pending) >= limit:
             self._trigger_queue()
         Message._gc_push_messages()
         return True
@@ -344,10 +404,13 @@ class CheckinmePush(models.AbstractModel):
         }
 
     @api.model
-    def _send_message(self, message, session=None):
+    def _send_message(self, message, session=None, devices=None):
         """Deliver one queued message to every device of its recipients and log the result.
 
-        :return: dict ``{'web', 'native', 'state', 'error'}`` (number of devices reached)
+        :param devices: only send to these devices of the recipients (``mail.push.device`` or
+            ``checkinme.push.device`` records), e.g. the phone that asked for a test notification
+        :return: dict ``{'web', 'native', 'devices', 'state', 'error'}``: number of devices reached,
+            number of devices targeted, final state and the errors (raw, for the log only)
         """
         message.ensure_one()
         message = message.sudo()
@@ -361,6 +424,9 @@ class CheckinmePush(models.AbstractModel):
             # --- browsers / PWA (Web Push) -----------------------------------
             web_devices = self.env['mail.push.device'].sudo().search(
                 [('partner_id', 'in', users.partner_id.ids)]) if users and not message.native_only else []
+            if devices is not None and web_devices:
+                web_devices = web_devices & devices.sudo() if devices._name == 'mail.push.device' \
+                    else web_devices.browse()
             if web_devices:
                 private_key, public_key = self._get_vapid_keys()
                 if not (private_key and public_key):
@@ -387,6 +453,9 @@ class CheckinmePush(models.AbstractModel):
             # --- Android app (FCM) -------------------------------------------
             native_devices = self.env['checkinme.push.device'].sudo().search(
                 [('user_id', 'in', users.ids)]) if users else []
+            if devices is not None and native_devices:
+                native_devices = native_devices & devices.sudo() if devices._name == 'checkinme.push.device' \
+                    else native_devices.browse()
             if native_devices:
                 service_account = self._get_fcm_service_account()
                 if not service_account:
@@ -423,40 +492,91 @@ class CheckinmePush(models.AbstractModel):
         else:
             state = 'failed'
         error = '\n'.join(str(error) for error in errors)[:4000] or False
-        message.write({
+        vals = {
             'state': state,
             'web_push_count': web_ok,
             'native_count': native_ok,
             'error': error,
             'sent_date': fields.Datetime.now(),
-        })
-        return {'web': web_ok, 'native': native_ok, 'state': state, 'error': error or ''}
+        }
+        if message.event == 'odoo_message' and state in ('sent', 'no_device'):
+            # copy of a chat / chatter message: do not keep its content in the log once delivered
+            vals['body'] = False
+        message.write(vals)
+        return {
+            'web': web_ok, 'native': native_ok, 'devices': len(web_devices) + len(native_devices),
+            'state': state, 'error': error or '',
+        }
 
     # ------------------------------------------------------------------
     # Test notification (settings button and phone screen)
     # ------------------------------------------------------------------
     @api.model
-    def _send_test_notification(self, user=None):
+    def _get_user_device(self, user, endpoint=None, token=None):
+        """The device of ``user`` identified by a browser push ``endpoint`` (``mail.push.device``)
+        or an Android app FCM ``token`` (active ``checkinme.push.device``); empty when it is not
+        registered for this user."""
+        if token:
+            token = token.strip() if isinstance(token, str) and len(token) <= MAX_TOKEN_LENGTH else ''
+            return self.env['checkinme.push.device'].sudo().search(
+                [('token', '=', token), ('user_id', '=', user.id)], limit=1) if token \
+                else self.env['checkinme.push.device']
+        endpoint = endpoint.strip() if isinstance(endpoint, str) and len(endpoint) <= MAX_ENDPOINT_LENGTH else ''
+        return self.env['mail.push.device'].sudo().search(
+            [('endpoint', '=', endpoint), ('partner_id', '=', user.partner_id.id)], limit=1) if endpoint \
+            else self.env['mail.push.device']
+
+    @api.model
+    def _send_test_notification(self, user=None, endpoint=None, token=None):
         """Queue a test notification to ``user`` (default: current user) and send it now.
 
-        :return: dict ``{'web', 'native', 'state', 'message'}``
+        Given the push ``endpoint`` of this browser or the FCM ``token`` of this Android app, only
+        this device receives it. The returned message is meant for the user: the raw errors of the
+        push services are only logged (server log and Push Logs).
+
+        :return: dict ``{'web', 'native', 'state', 'message', 'this_device'}``; ``this_device`` is
+            True / False when this device was reached / was not (or is not registered), None when
+            no endpoint or token was given
         """
         user = user or self.env.user
-        now = datetime.now(safe_timezone(user.tz or self.env.company.partner_id.tz))
+        device = None
+        if endpoint or token:
+            device = self._get_user_device(user, endpoint=endpoint, token=token)
+            if not device:
+                return {
+                    'web': 0, 'native': 0, 'state': 'no_device', 'this_device': False,
+                    'message': _("This device is not registered for notifications yet. Tap \"Enable "
+                                 "notifications\" first (on an iPhone, open ABJ from its Home Screen icon)."),
+                }
+        tz = user.tz or self.env.company.partner_id.tz or 'UTC'
+        now = format_datetime(self.env, fields.Datetime.now(), tz=tz, dt_format='dd MMM y HH:mm')
         message = self._notify(
-            user, _("ABJ test notification"),
-            _("Notifications work on this device (%s).", now.strftime('%d %b %Y %H:%M')),
+            user, _("ABJ test notification"), _("Notifications work on this device (%s).", now),
             url=APP_URL, event='test')
         if not message:
             return {
-                'web': 0, 'native': 0, 'state': 'no_device',
+                'web': 0, 'native': 0, 'state': 'no_device', 'this_device': False if device is not None else None,
                 'message': _("No device is registered for your notifications yet. Open ABJ on your phone, "
                              "go to Settings and tap \"Enable notifications\" (on an iPhone, add ABJ to the "
                              "Home Screen first: Share > Add to Home Screen, iOS 16.4 or later)."),
             }
-        result = self._send_message(message)
-        text = _("Sent to %(web)s browser/PWA device(s) and %(native)s Android app device(s).",
-                 web=result['web'], native=result['native'])
+        result = self._send_message(message, devices=device)
+        reached = result['web'] + result['native']
         if result['error']:
-            text = "%s\n%s" % (text, result['error'])
-        return {'web': result['web'], 'native': result['native'], 'state': result['state'], 'message': text}
+            _logger.info("ABJ push: test notification %s for user %s: %s", message.id, user.id, result['error'])
+        if device is not None:
+            this_device = bool(reached)
+            text = _("Test notification sent to this device.") if this_device else \
+                _("This device could not be reached. A manager can see the details in Push Logs.")
+        else:
+            this_device = None
+            text = _("Sent to %(web)s browser/PWA device(s) and %(native)s Android app device(s).",
+                     web=result['web'], native=result['native'])
+            failed = result['devices'] - reached
+            if failed:
+                text = "%s\n%s" % (text, _("%s device(s) could not be reached. A manager can see the details "
+                                           "in Push Logs.", failed))
+        return {
+            'web': result['web'], 'native': result['native'], 'state': result['state'],
+            'message': text, 'this_device': this_device,
+        }

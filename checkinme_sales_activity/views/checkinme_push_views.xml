@@ -58,6 +58,7 @@
                             <field name="web_push_count" readonly="1"/>
                             <field name="native_count" readonly="1"/>
                             <field name="native_only" readonly="1"/>
+                            <field name="attempt_count" readonly="1" groups="base.group_no_one"/>
                             <field name="res_model" readonly="1" groups="base.group_no_one"/>
                             <field name="res_id" readonly="1" groups="base.group_no_one"/>
                             <field name="company_id" groups="base.group_multi_company" readonly="1"/>
@@ -158,7 +159,8 @@
                         <group>
                             <field name="last_seen" readonly="1"/>
                             <field name="active"/>
-                            <field name="token" readonly="1" groups="base.group_no_one"/>
+                            <field name="blocked" invisible="not blocked"/>
+                            <field name="token" readonly="1" groups="base.group_system"/>
                         </group>
                     </group>
                 </sheet>

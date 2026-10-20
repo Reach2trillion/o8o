@@ -10,6 +10,7 @@ from markupsafe import Markup, escape
 
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.tools.misc import format_datetime
 
 _logger = logging.getLogger(__name__)
 
@@ -183,6 +184,12 @@ class CheckinmeCheckin(models.Model):
         if not dt:
             return False
         return pytz.utc.localize(dt).astimezone(safe_timezone(self._get_tz_name()))
+
+    def _format_local(self, dt, pattern='dd MMM y HH:mm'):
+        """Naive UTC datetime ``dt`` in the salesperson's timezone, formatted with the LDML
+        ``pattern`` in the language of the environment (month and day names included)."""
+        self.ensure_one()
+        return format_datetime(self.env, dt, tz=self._get_tz_name(), dt_format=pattern) if dt else ''
 
     def get_local_datetime_str(self, field_name='checkin_time', fmt='%d %b %Y %H:%M'):
         """Public helper for QWeb reports: local formatted datetime of a datetime field."""
@@ -574,10 +581,9 @@ class CheckinmeCheckin(models.Model):
                 if not user or user == self.env.user:
                     continue
                 rec_lang = rec.with_context(lang=user.lang or self.env.lang)
-                when = rec._to_local(rec.checkin_time)
                 body = ' · '.join(filter(None, [
                     rec.sudo().partner_id.display_name or rec.checkin_type_id.name,
-                    when.strftime('%d %b %Y %H:%M') if when else '',
+                    rec_lang._format_local(rec.checkin_time),
                 ]))
                 self.env['checkinme.push']._notify(
                     user, rec_lang.env._("New visit planned"), body, event='planned_visit', record=rec)
@@ -600,8 +606,14 @@ class CheckinmeCheckin(models.Model):
             if not managers:
                 return
             is_checkout = event == 'checkout'
-            for lang in set(managers.mapped('lang')):
-                rec = self.with_context(lang=lang or self.env.lang)
+            # one notification per language (users without a language get the current one)
+            fallback_lang = self.env.lang or 'en_US'
+            by_lang = {}
+            for user in managers:
+                lang = user.lang or fallback_lang
+                by_lang[lang] = by_lang.get(lang, self.env['res.users']) | user
+            for lang, lang_managers in by_lang.items():
+                rec = self.with_context(lang=lang)
                 env = rec.env
                 if is_checkout:
                     title = env._("%s checked out", employee.name)
@@ -623,8 +635,8 @@ class CheckinmeCheckin(models.Model):
                 what = rec.sudo().partner_id.display_name or rec.checkin_type_id.name
                 body = ' · '.join(filter(None, [what] + details))
                 self.env['checkinme.push']._notify(
-                    managers.filtered(lambda user: (user.lang or self.env.lang) == (lang or self.env.lang)),
-                    title, body, event='team_checkout' if is_checkout else 'team_checkin', record=self)
+                    lang_managers, title, body, event='team_checkout' if is_checkout else 'team_checkin',
+                    record=self)
         except Exception:  # noqa: BLE001
             _logger.exception("Sale Check: team %s push failed for %s", event, self.name)
 
@@ -634,6 +646,9 @@ class CheckinmeCheckin(models.Model):
         if not self.env['checkinme.config']._get_bool('checkinme.push_followup_reminder', True):
             return False
         Push = self.env['checkinme.push']
+        # one notification per salesperson, whatever the number of companies they work for
+        # (notifications with the same tag replace each other on the phone)
+        reminders = {}  # user id -> [user, company, today, visit ids]
         for company in self.env['res.company'].search([]):
             today = self._get_today(company)
             groups = self.sudo()._read_group([
@@ -643,18 +658,20 @@ class CheckinmeCheckin(models.Model):
                 ('user_id', '!=', False),
             ], ['user_id'], ['id:array_agg'])
             for user, ids in groups:
-                visits = self.sudo().browse(sorted(ids))
-                env = visits.with_context(lang=user.lang or self.env.lang).env
-                count = len(visits)
-                title = env._("1 follow-up today") if count == 1 else env._("%s follow-ups today", count)
-                names = []
-                for visit in visits:
-                    name = visit.partner_id.display_name or visit.purpose or visit.name
-                    if name not in names:
-                        names.append(name)
-                body = ', '.join(names[:3]) + (' +%d' % (len(names) - 3) if len(names) > 3 else '')
-                Push.with_company(company)._notify(
-                    user, title, body, url='/odoo/abj', event='followup_reminder', tag='abj-followup-%s' % today)
+                reminders.setdefault(user.id, [user, company, today, []])[3].extend(ids)
+        for user, company, today, ids in reminders.values():
+            visits = self.sudo().browse(sorted(ids))
+            env = visits.with_context(lang=user.lang or self.env.lang).env
+            count = len(visits)
+            title = env._("1 follow-up today") if count == 1 else env._("%s follow-ups today", count)
+            names = []
+            for visit in visits:
+                name = visit.partner_id.display_name or visit.purpose or visit.name
+                if name not in names:
+                    names.append(name)
+            body = ', '.join(names[:3]) + (' +%d' % (len(names) - 3) if len(names) > 3 else '')
+            Push.with_company(company)._notify(
+                user, title, body, url='/odoo/abj', event='followup_reminder', tag='abj-followup-%s' % today)
         return True
 
     # ------------------------------------------------------------------

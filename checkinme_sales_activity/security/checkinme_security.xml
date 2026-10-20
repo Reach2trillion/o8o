@@ -87,6 +87,27 @@
             <field name="global" eval="True"/>
             <field name="domain_force">['|', ('company_id', 'in', company_ids), ('company_id', '=', False)]</field>
         </record>
+        <!-- copies of Odoo chat / chatter messages: only administrators may read them -->
+        <record id="checkinme_push_message_rule_manager" model="ir.rule">
+            <field name="name">ABJ push log: managers, without Odoo messages</field>
+            <field name="model_id" ref="model_checkinme_push_message"/>
+            <field name="domain_force">[('event', '!=', 'odoo_message')]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_manager'))]"/>
+        </record>
+        <record id="checkinme_push_message_rule_system" model="ir.rule">
+            <field name="name">ABJ push log: administrators see all</field>
+            <field name="model_id" ref="model_checkinme_push_message"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        </record>
+
+        <!-- ABJ app devices -->
+        <record id="checkinme_push_device_rule_manager" model="ir.rule">
+            <field name="name">ABJ app device: users of the allowed companies</field>
+            <field name="model_id" ref="model_checkinme_push_device"/>
+            <field name="domain_force">[('user_id.company_ids', 'in', company_ids)]</field>
+            <field name="groups" eval="[(4, ref('group_checkinme_manager'))]"/>
+        </record>
 
         <!-- Performance report (SQL view) -->
         <record id="checkinme_performance_report_rule_user" model="ir.rule">

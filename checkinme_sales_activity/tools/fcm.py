@@ -32,6 +32,10 @@ ASSERTION_LIFETIME = 3600
 TOKEN_REFRESH_MARGIN = 300
 DEFAULT_CHANNEL_ID = 'abj_default'
 REQUIRED_KEYS = ('project_id', 'client_email', 'private_key')
+# FCM refuses messages over 4096 bytes: the notification text is clipped well below that, in
+# UTF-8 bytes (3 per Khmer character), so that even the JSON-escaped request stays under the limit
+MAX_TITLE_BYTES = 256
+MAX_BODY_BYTES = 1024
 
 # (dbname, client_email, private_key_id) -> (access_token, expires_at)
 _token_cache = {}
@@ -88,6 +92,16 @@ def parse_service_account(value):
 
 def _b64url(data):
     return base64.urlsafe_b64encode(data).rstrip(b'=').decode('ascii')
+
+
+def clip_utf8(text, max_bytes):
+    """``text`` cut to at most ``max_bytes`` UTF-8 bytes (on a character boundary, with an
+    ellipsis when cut)."""
+    text = text or ''
+    raw = text.encode('utf-8')
+    if len(raw) <= max_bytes:
+        return text
+    return raw[:max_bytes - 3].decode('utf-8', 'ignore') + '\u2026'
 
 
 def should_deactivate(error_code, message=''):
@@ -180,7 +194,7 @@ class FcmClient:
         return {
             'message': {
                 'token': token,
-                'notification': {'title': title or '', 'body': body or ''},
+                'notification': {'title': clip_utf8(title, MAX_TITLE_BYTES), 'body': clip_utf8(body, MAX_BODY_BYTES)},
                 # FCM only accepts string values in "data"
                 'data': {str(key): '' if value is None else str(value) for key, value in (data or {}).items()},
                 'android': {

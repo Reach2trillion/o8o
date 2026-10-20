@@ -38,6 +38,10 @@ class CheckinmeCheckinMobile(models.Model):
             'name': self.name,
             'state': self.state,
             'state_label': state_labels.get(self.state, ''),
+            'employee_id': self.employee_id.id,
+            'employee_name': self.employee_id.name or '',
+            # the phone only offers check-in / check-out on the user's own visits
+            'is_mine': self._is_mine(),
             'partner_id': self.partner_id.id,
             'partner_name': self.partner_id.display_name or '',
             'partner_address': ' '.join((self.partner_id._display_address(without_company=True) or '').split()) if self.partner_id else '',
@@ -49,7 +53,7 @@ class CheckinmeCheckinMobile(models.Model):
             'notes': self.notes or '',
             'checkin_time': fields.Datetime.to_string(self.checkin_time) if self.checkin_time else False,
             'checkin_time_local': checkin_local.strftime('%H:%M') if checkin_local else '',
-            'checkin_date_local': checkin_local.strftime('%d %b %Y') if checkin_local else '',
+            'checkin_date_local': self._format_local(self.checkin_time, 'dd MMM y'),
             'checkout_time_local': checkout_local.strftime('%H:%M') if checkout_local else '',
             'duration': self.duration,
             'latitude': self.latitude,
@@ -71,6 +75,11 @@ class CheckinmeCheckinMobile(models.Model):
             'sale_orders': self._mobile_sale_orders_vals(),
         }
 
+    def _is_mine(self):
+        """True when the visit belongs to the current user (same rule as the 'own records' rule)."""
+        self.ensure_one()
+        return bool(self.employee_id) and self.employee_id.user_id == self.env.user
+
     def _mobile_sale_orders_vals(self):
         """Sales orders taken during the visit that the user may read (for the "Print" buttons)."""
         self.ensure_one()
@@ -82,7 +91,7 @@ class CheckinmeCheckinMobile(models.Model):
             'name': order.name,
             'state_label': state_labels.get(order.state, ''),
             'amount_total_display': formatLang(self.env, order.amount_total, currency_obj=order.currency_id),
-        } for order in self.sale_order_ids._filtered_access('read')]
+        } for order in self.sale_order_ids.filtered(lambda o: o.state != 'cancel')._filtered_access('read')]
 
     @api.model
     def _mobile_app_vals(self):
@@ -171,7 +180,7 @@ class CheckinmeCheckinMobile(models.Model):
             },
             'user_name': self.env.user.name,
             'today': fields.Date.to_string(today),
-            'today_label': today.strftime('%A %d %B %Y'),
+            'today_label': format_date(self.env, today, date_format='EEEE dd MMMM y'),
             'currency_symbol': company.currency_id.symbol or '',
             'settings': {
                 'require_gps': config._get_bool('checkinme.require_gps', True),
@@ -186,6 +195,7 @@ class CheckinmeCheckinMobile(models.Model):
                          self._fields['outcome']._description_selection(self.env)],
             'open_visit': False,
             'planned_today': [],
+            'followups_today': [],
             'today_visits': [],
             'today_stats': {'checkins': 0, 'visits': 0, 'verified': 0, 'customers': 0},
             'target': False,
@@ -199,6 +209,10 @@ class CheckinmeCheckinMobile(models.Model):
         planned = self.search(base_domain + [('state', '=', 'draft'), ('checkin_date', '<=', today)],
                               order='checkin_time asc', limit=20)
         data['planned_today'] = [p._mobile_vals() for p in planned]
+        # customers to call back today (same rule as the morning follow-up reminder)
+        followups = self.search(base_domain + [('state', '=', 'done'), ('next_action_date', '=', today)],
+                                order='id', limit=20)
+        data['followups_today'] = [f._mobile_vals() for f in followups]
         done_today = self.search(base_domain + [('state', 'in', ('checked_in', 'done')), ('checkin_date', '=', today)],
                                  order='checkin_time desc, id desc')
         data['today_visits'] = [c._mobile_vals() for c in done_today]
@@ -295,7 +309,7 @@ class CheckinmeCheckinMobile(models.Model):
         values = {
             'employee_id': employee.id,
             'partner_id': vals.get('partner_id') or False,
-            'checkin_type_id': vals.get('type_id') or self._default_activity_type_id().id,
+            'checkin_type_id': vals.get('type_id') or self._default_checkin_type_id().id,
             'purpose': (vals.get('purpose') or '').strip() or False,
             'notes': (vals.get('notes') or '').strip() or False,
             'latitude': float(vals.get('latitude') or 0.0),
@@ -307,6 +321,8 @@ class CheckinmeCheckinMobile(models.Model):
             values['photo'] = vals['photo']
         if vals.get('planned_id'):
             planned = self.browse(int(vals['planned_id'])).exists()
+            if planned and not planned._is_mine():
+                raise UserError(_("You can only check in or out your own visits."))
             if planned and planned.state == 'draft':
                 planned.write({k: v for k, v in values.items() if k not in ('state', 'employee_id') and v})
                 planned.action_check_in()
@@ -318,6 +334,8 @@ class CheckinmeCheckinMobile(models.Model):
     def mobile_checkout(self, checkin_id, vals):
         """Check out an open visit from the phone screen."""
         checkin = self.browse(int(checkin_id)).exists()
+        if checkin and not checkin._is_mine():
+            raise UserError(_("You can only check in or out your own visits."))
         if not checkin or checkin.state != 'checked_in':
             raise UserError(_("This visit is not checked in."))
         values = {}
@@ -357,10 +375,11 @@ class CheckinmeCheckinMobile(models.Model):
         return [r._mobile_vals() for r in records]
 
     @api.model
-    def mobile_send_test_push(self):
+    def mobile_send_test_push(self, endpoint=None, token=None):
         """"Send test notification" of the phone screen settings: push to the current user's
-        devices now. Returns ``{'web', 'native', 'state', 'message'}``."""
-        return self.env['checkinme.push']._send_test_notification(self.env.user)
+        devices now, or only to this phone given its browser push ``endpoint`` or its Android app
+        FCM ``token``. Returns ``{'web', 'native', 'state', 'message', 'this_device'}``."""
+        return self.env['checkinme.push']._send_test_notification(self.env.user, endpoint=endpoint, token=token)
 
     # ------------------------------------------------------------------
     # Receipts (printed by the phone on a Bluetooth / network receipt printer)
@@ -383,6 +402,8 @@ class CheckinmeCheckinMobile(models.Model):
             if not order or order.sudo().checkinme_checkin_id != checkin:
                 raise UserError(_("This sales order is not linked to the visit %s.", checkin.name))
             order.check_access('read')
+            if order.state == 'cancel':
+                raise UserError(_("The sales order %s is cancelled.", order.name))
             return checkin._receipt_order(order)
         if kind != 'visit':
             raise UserError(_("Unknown receipt type: %s", kind))
@@ -403,10 +424,10 @@ class CheckinmeCheckinMobile(models.Model):
         return blocks
 
     def _receipt_footer(self):
-        now = self._to_local(fields.Datetime.now())
+        now = self._format_local(fields.Datetime.now())
         return [
             {'type': 'separator'},
-            {'type': 'text', 'text': _("Printed %s", now.strftime('%d %b %Y %H:%M')), 'align': 'center', 'size': 's'},
+            {'type': 'text', 'text': _("Printed %s", now), 'align': 'center', 'size': 's'},
             {'type': 'feed', 'lines': 3},
         ]
 
@@ -428,7 +449,7 @@ class CheckinmeCheckinMobile(models.Model):
             {'type': 'separator'},
         ]
         if checkin_local:
-            blocks.append(pair(_("Date"), checkin_local.strftime('%d %b %Y')))
+            blocks.append(pair(_("Date"), self._format_local(self.checkin_time, 'dd MMM y')))
             blocks.append(pair(_("Check-in"), checkin_local.strftime('%H:%M')))
         if checkout_local:
             blocks.append(pair(_("Check-out"), checkout_local.strftime('%H:%M')))
@@ -477,22 +498,23 @@ class CheckinmeCheckinMobile(models.Model):
         currency = order.currency_id
         pair = self._receipt_pair
 
-        def amount(value):
-            return formatLang(self.env, value, currency_obj=currency)
+        precision = self.env['decimal.precision'].precision_get
 
-        def number(value):
-            return formatLang(self.env, value, digits=0 if float(value).is_integer() else 2)
+        def amount(value, dp=None):
+            return formatLang(self.env, value, dp=dp, currency_obj=currency)
+
+        def number(value, dp):
+            return formatLang(self.env, value, digits=0 if float(value).is_integer() else precision(dp))
 
         title = _("QUOTATION") if order.state in ('draft', 'sent') else _("SALES ORDER")
-        order_local = self._to_local(order.date_order)
         blocks = self._receipt_header()
         blocks += [
             {'type': 'text', 'text': title, 'align': 'center', 'size': 'm', 'bold': True},
             {'type': 'text', 'text': order.name, 'align': 'center', 'size': 'm'},
             {'type': 'separator'},
         ]
-        if order_local:
-            blocks.append(pair(_("Date"), order_local.strftime('%d %b %Y %H:%M')))
+        if order.date_order:
+            blocks.append(pair(_("Date"), self._format_local(order.date_order)))
         blocks.append(pair(_("Customer"), order.partner_id.display_name, bold=True))
         if order.user_id:
             blocks.append(pair(_("Salesperson"), order.user_id.name))
@@ -504,10 +526,11 @@ class CheckinmeCheckinMobile(models.Model):
             elif line.display_type:
                 blocks.append({'type': 'text', 'text': line.name or '', 'size': 's'})
             else:
-                quantity = ' '.join(filter(None, [number(line.product_uom_qty), line.product_uom.name]))
-                detail = "%s × %s" % (quantity, amount(line.price_unit))
+                quantity = ' '.join(filter(None, [number(line.product_uom_qty, 'Product Unit of Measure'),
+                                                  line.product_uom.name]))
+                detail = "%s × %s" % (quantity, amount(line.price_unit, dp='Product Price'))
                 if line.discount:
-                    detail += " (-%s%%)" % number(line.discount)
+                    detail += " (-%s%%)" % number(line.discount, 'Discount')
                 blocks.append({
                     'type': 'item',
                     'name': line.name or line.product_id.display_name or '',

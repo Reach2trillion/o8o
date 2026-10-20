@@ -7,6 +7,7 @@ but with a real ``TTL`` and ``Urgency``: mail sends ``TTL: 60``, so a phone that
 offline for more than a minute never receives the notification, and push services may delay
 normal-urgency messages on battery saving devices (iOS, Android doze).
 """
+import ipaddress
 import logging
 import textwrap
 from urllib.parse import urlsplit
@@ -30,6 +31,27 @@ class WebPushError(Exception):
         self.status_code = status_code
 
 
+def is_valid_endpoint(url):
+    """True for an https URL on a public host name (not an IP address, not localhost).
+
+    :param url: ``urllib.parse.SplitResult`` of the endpoint
+    """
+    try:
+        host = (url.hostname or '').rstrip('.').lower()
+        url.port  # noqa: B018 - raises ValueError on an invalid port
+    except ValueError:
+        return False
+    if url.scheme != 'https' or not host or '.' not in host:
+        return False
+    if host == 'localhost' or host.endswith(('.localhost', '.local', '.internal')):
+        return False
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return False
+
+
 def send_web_push(base_url, device, payload, vapid_private_key, vapid_public_key, session,
                   ttl=DEFAULT_TTL, urgency='high'):
     """Encrypt ``payload`` (a JSON string) for the browser subscription ``device`` and post it to
@@ -50,6 +72,11 @@ def send_web_push(base_url, device, payload, vapid_private_key, vapid_public_key
     # ".invalid" is the TLD reserved for names that can never resolve (RFC 2606), as in mail
     if url.netloc.endswith('.invalid'):
         raise DeviceUnreachableError("Device Unreachable")
+    # browsers only hand out https endpoints on the push services' public host names: anything
+    # else (any user can register an endpoint) must never make the server post to it
+    if not is_valid_endpoint(url):
+        _logger.warning("ABJ web push: invalid endpoint host %r refused", url.hostname)
+        raise DeviceUnreachableError("Invalid push endpoint")
     claims = {
         'aud': '{}://{}'.format(url.scheme, url.netloc),
         'sub': base_url,
