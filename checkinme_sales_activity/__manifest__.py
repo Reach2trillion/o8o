@@ -49,6 +49,7 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
         'views/sale_order_views.xml',
         'views/res_config_settings_views.xml',
         'views/checkinme_mobile_views.xml',
+        'views/checkinme_push_views.xml',
         # wizard
         'wizard/checkinme_report_wizard_views.xml',
         # reports
@@ -67,6 +68,7 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
             'checkinme_sales_activity/static/src/views/**/*',
             'checkinme_sales_activity/static/src/screen_loader/**/*',
             'checkinme_sales_activity/static/src/screen_templates/**/*',
+            'checkinme_sales_activity/static/src/native/**/*',
         ],
         # Phone screen: loaded on demand (lazy bundle), like a quick-order screen
         'checkinme_sales_activity.assets_screen': [

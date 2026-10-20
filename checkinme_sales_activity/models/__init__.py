@@ -9,3 +9,5 @@ from . import hr_employee
 from . import res_partner
 from . import sale_order
 from . import checkinme_mobile
+from . import checkinme_push
+from . import mail_thread
