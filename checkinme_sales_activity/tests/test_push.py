@@ -138,6 +138,10 @@ class TestPushDevices(PushCommon):
                          {'id': device.id, 'active': False})
         self.assertFalse(device.active)
         self.assertFalse(self.Push._notify(self.rep, 'Hello', 'Nobody', native_only=True))
+        # the app's test button explains why this phone gets nothing
+        result = self.env['checkinme.checkin'].with_user(self.rep).mobile_send_test_push(token='lost-phone')
+        self.assertEqual((result['this_device'], result['state']), (False, 'no_device'))
+        self.assertIn('turned off notifications for this phone', result['message'])
         # unarchived by the manager: it works again
         device.with_user(self.manager).action_unarchive()
         self.assertEqual((device.active, device.blocked), (True, False))

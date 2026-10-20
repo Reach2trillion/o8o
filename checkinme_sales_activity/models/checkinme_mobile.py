@@ -212,9 +212,12 @@ class CheckinmeCheckinMobile(models.Model):
         # customers to call back today (same rule as the morning follow-up reminder)
         followups = self.search(base_domain + [('state', '=', 'done'), ('next_action_date', '=', today)],
                                 order='id', limit=20)
-        data['followups_today'] = [f._mobile_vals() for f in followups]
         done_today = self.search(base_domain + [('state', 'in', ('checked_in', 'done')), ('checkin_date', '=', today)],
                                  order='checkin_time desc, id desc')
+        # a follow-up is handled once its customer has been visited again today
+        followups = followups.filtered(lambda f: not any(
+            v.id > f.id and v.partner_id == f.partner_id for v in done_today))
+        data['followups_today'] = [f._mobile_vals() for f in followups]
         data['today_visits'] = [c._mobile_vals() for c in done_today]
         visits = done_today.filtered('counts_as_visit')
         data['today_stats'] = {
@@ -363,6 +366,8 @@ class CheckinmeCheckinMobile(models.Model):
         checkin = self.browse(int(checkin_id)).exists()
         if not checkin:
             raise UserError(_("This check-in no longer exists."))
+        if not checkin.has_access('read'):
+            raise UserError(_("This visit belongs to another salesperson."))
         return checkin._mobile_vals()
 
     @api.model

@@ -311,7 +311,7 @@
     <t t-name="checkinme_sales_activity.ScreenResult">
         <t t-set="r" t-value="state.result"/>
         <section class="o_checkinme_card text-center">
-            <div t-attf-class="o_checkinme_geo_icon {{ r.location_status === 'verified' ? 'text-success' : 'text-primary' }}">
+            <div t-attf-class="o_checkinme_geo_icon {{ r.location_status === 'verified' ? 'text-success' : '' }}">
                 <i t-attf-class="fa {{ state.resultKind === 'checkout' ? 'fa-flag-checkered' : 'fa-check-circle' }}"/>
             </div>
             <div class="o_checkinme_visit_name">
@@ -329,7 +329,7 @@
                     <t t-if="r.location_status === 'verified' or r.location_status === 'far'"> (<t t-esc="formatDistance(r.distance_to_partner)"/>)</t>
                 </span>
             </div>
-            <div class="o_checkinme_muted mt-2">
+            <div t-if="dashboard and dashboard.settings.telegram_enabled" class="o_checkinme_muted mt-2">
                 <t t-if="r.telegram_pending"><i class="fa fa-paper-plane me-1"/>Telegram notification queued</t>
                 <t t-elif="r.telegram_notified"><i class="fa fa-paper-plane me-1 text-success"/>Managers notified on Telegram</t>
             </div>

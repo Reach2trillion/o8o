@@ -179,7 +179,7 @@ class TestMobileScreen(CheckinmeCommon):
         later = self._create_checkin(self.rep, partner_id=self.partner_nogeo.id)
         later.write({'next_action_date': fields.Date.add(today, days=1)})
         later.action_check_out()
-        still_open = self._create_checkin(self.rep, next_action_date=today)
+        still_open = self._create_checkin(self.rep, partner_id=self.partner_nogeo.id, next_action_date=today)
         other = self._create_checkin(self.other_rep, next_action_date=today)
         other.action_check_out()
         data = self._rep_checkin_model().mobile_get_dashboard()
@@ -187,6 +187,12 @@ class TestMobileScreen(CheckinmeCommon):
         self.assertEqual(data['followups_today'][0]['partner_name'], self.partner_geo.display_name)
         self.assertEqual(data['followups_today'][0]['next_action_date'], fields.Date.to_string(today))
         self.assertNotIn(still_open.id, [f['id'] for f in data['followups_today']])
+        # once the customer has been visited again today, the follow-up is handled
+        still_open.action_check_out()
+        again = self._create_checkin(self.rep)
+        data = self._rep_checkin_model().mobile_get_dashboard()
+        self.assertNotIn(due.id, [f['id'] for f in data['followups_today']])
+        self.assertIn(again.id, [v['id'] for v in data['today_visits']])
 
     def test_dates_in_the_user_language(self):
         """C5 / requirements-untranslatable-dates-strings: month and day names follow the language."""
@@ -218,3 +224,6 @@ class TestMobileScreen(CheckinmeCommon):
         # other people's visits are invisible to a salesperson
         other = self._create_checkin(self.other_rep)
         self.assertNotIn(other.id, [h['id'] for h in Checkin.mobile_get_history()])
+        # a deep link to it gets a readable message, not Odoo's access error
+        with self.assertRaisesRegex(UserError, 'another salesperson'):
+            Checkin.mobile_get_checkin(other.id)

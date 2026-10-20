@@ -296,6 +296,9 @@ export class CheckinmeScreen extends Component {
             if (push.permission === "denied") {
                 return { label: _t("Blocked"), badge: "behind", hint: _t("Notifications are blocked for ABJ. Allow them in the app settings.") };
             }
+            if (push.blocked) {
+                return { label: _t("Turned off"), badge: "behind", hint: _t("A manager turned off notifications for this phone. Ask them to unarchive it in ABJ App Devices.") };
+            }
             if (push.permission === "granted") {
                 return push.registered
                     ? { label: _t("On"), badge: "verified", hint: "" }

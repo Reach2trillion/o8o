@@ -542,6 +542,15 @@ class CheckinmePush(models.AbstractModel):
         device = None
         if endpoint or token:
             device = self._get_user_device(user, endpoint=endpoint, token=token)
+            blocked = not device and isinstance(token, str) and token.strip() and \
+                self.env['checkinme.push.device'].sudo().with_context(active_test=False).search_count(
+                    [('token', '=', token.strip()), ('user_id', '=', user.id), ('blocked', '=', True)], limit=1)
+            if blocked:
+                return {
+                    'web': 0, 'native': 0, 'state': 'no_device', 'this_device': False,
+                    'message': _("A manager turned off notifications for this phone. Ask them to unarchive it "
+                                 "in ABJ App Devices."),
+                }
             if not device:
                 return {
                     'web': 0, 'native': 0, 'state': 'no_device', 'this_device': False,

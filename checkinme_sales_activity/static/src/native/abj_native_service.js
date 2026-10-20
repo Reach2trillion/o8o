@@ -52,6 +52,8 @@ export const abjNativeService = {
             // "unknown" | "prompt" | "prompt-with-rationale" | "granted" | "denied"
             permission: "unknown",
             registered: false,
+            // archived by a manager in ABJ App Devices: the server ignores this phone
+            blocked: false,
             error: "",
         });
         let infoPromise = null;
@@ -200,12 +202,13 @@ export const abjNativeService = {
             await push.addListener("registration", async ({ value }) => {
                 pushToken = value || null;
                 try {
-                    await orm.call("checkinme.push.device", "register_device", [value], {
+                    const result = await orm.call("checkinme.push.device", "register_device", [value], {
                         platform: "android",
                         device_name: deviceName(),
                         app_version: info.appVersion ? `${info.appVersion} (${info.appBuild || "?"})` : "",
                     });
-                    pushStatus.registered = true;
+                    pushStatus.blocked = result?.active === false;
+                    pushStatus.registered = !pushStatus.blocked;
                     pushStatus.error = "";
                 } catch (error) {
                     pushStatus.registered = false;
