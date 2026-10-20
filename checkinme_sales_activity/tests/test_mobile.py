@@ -193,6 +193,18 @@ class TestMobileScreen(CheckinmeCommon):
         data = self._rep_checkin_model().mobile_get_dashboard()
         self.assertNotIn(due.id, [f['id'] for f in data['followups_today']])
         self.assertIn(again.id, [v['id'] for v in data['today_visits']])
+        # also when the new visit is a planned visit created before the follow-up (lower id)
+        shop = self.env['res.partner'].create({'name': 'Psar Thmei Cosmetics'})
+        planned = self._create_checkin(self.rep, partner_id=shop.id, state='draft',
+                                       checkin_time=fields.Datetime.now())
+        older = self._create_checkin(self.rep, partner_id=shop.id, next_action_date=today,
+                                     checkin_time=fields.Datetime.subtract(fields.Datetime.now(), days=3))
+        older.action_check_out()
+        data = self._rep_checkin_model().mobile_get_dashboard()
+        self.assertIn(older.id, [f['id'] for f in data['followups_today']])
+        planned.action_check_in()
+        data = self._rep_checkin_model().mobile_get_dashboard()
+        self.assertNotIn(older.id, [f['id'] for f in data['followups_today']])
 
     def test_dates_in_the_user_language(self):
         """C5 / requirements-untranslatable-dates-strings: month and day names follow the language."""

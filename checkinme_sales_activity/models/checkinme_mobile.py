@@ -216,7 +216,7 @@ class CheckinmeCheckinMobile(models.Model):
                                  order='checkin_time desc, id desc')
         # a follow-up is handled once its customer has been visited again today
         followups = followups.filtered(lambda f: not any(
-            v.id > f.id and v.partner_id == f.partner_id for v in done_today))
+            v.partner_id == f.partner_id and (v.checkin_time, v.id) > (f.checkin_time, f.id) for v in done_today))
         data['followups_today'] = [f._mobile_vals() for f in followups]
         data['today_visits'] = [c._mobile_vals() for c in done_today]
         visits = done_today.filtered('counts_as_visit')
