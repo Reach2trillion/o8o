@@ -9,12 +9,14 @@ from datetime import timedelta
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
-from odoo.tools.misc import formatLang
+from odoo.tools.misc import formatLang, format_date
 
 from .checkinme_checkin import haversine_distance, OUTCOMES
 
 NEARBY_RADIUS_M = 3000
 RECENT_DAYS = 90
+APP_NAME = 'ABJ'
+QR_SIZE = 180
 
 
 class CheckinmeCheckinMobile(models.Model):
@@ -66,6 +68,43 @@ class CheckinmeCheckinMobile(models.Model):
             'has_photo': bool(self.photo),
             'telegram_notified': self.telegram_notified,
             'telegram_pending': bool(self.telegram_pending_event),
+            'sale_orders': self._mobile_sale_orders_vals(),
+        }
+
+    def _mobile_sale_orders_vals(self):
+        """Sales orders taken during the visit that the user may read (for the "Print" buttons)."""
+        self.ensure_one()
+        if not self.env['sale.order'].has_access('read'):
+            return []
+        state_labels = dict(self.env['sale.order']._fields['state']._description_selection(self.env))
+        return [{
+            'id': order.id,
+            'name': order.name,
+            'state_label': state_labels.get(order.state, ''),
+            'amount_total_display': formatLang(self.env, order.amount_total, currency_obj=order.currency_id),
+        } for order in self.sale_order_ids._filtered_access('read')]
+
+    @api.model
+    def _mobile_app_vals(self):
+        """ABJ app information: push readiness and the company letterhead (receipts, about)."""
+        company = self.env.company.sudo()
+        return {
+            'name': APP_NAME,
+            'push': {
+                # mail (a dependency) creates the VAPID keys when the first browser subscribes
+                'web_push_ready': True,
+                'native_ready': self.env['checkinme.push']._is_native_ready(),
+            },
+            'company': {
+                'name': company.name or '',
+                'phone': company.phone or '',
+                'email': company.email or '',
+                'website': company.website or '',
+                'vat': company.vat or '',
+                'street': company.street or '',
+                'city': company.city or '',
+            },
+            'server_version': '18.0',
         }
 
     @api.model
@@ -150,6 +189,7 @@ class CheckinmeCheckinMobile(models.Model):
             'today_visits': [],
             'today_stats': {'checkins': 0, 'visits': 0, 'verified': 0, 'customers': 0},
             'target': False,
+            'app': self._mobile_app_vals(),
         }
         if not employee:
             return data
@@ -315,3 +355,170 @@ class CheckinmeCheckinMobile(models.Model):
         records = self.search([('employee_id', '=', employee.id), ('state', '!=', 'cancel')],
                               order='checkin_time desc, id desc', limit=limit)
         return [r._mobile_vals() for r in records]
+
+    @api.model
+    def mobile_send_test_push(self):
+        """"Send test notification" of the phone screen settings: push to the current user's
+        devices now. Returns ``{'web', 'native', 'state', 'message'}``."""
+        return self.env['checkinme.push']._send_test_notification(self.env.user)
+
+    # ------------------------------------------------------------------
+    # Receipts (printed by the phone on a Bluetooth / network receipt printer)
+    # ------------------------------------------------------------------
+    @api.model
+    def mobile_get_receipt(self, checkin_id, kind='visit', order_id=None):
+        """Receipt document of a visit (``kind='visit'``) or of a sales order taken during the
+        visit (``kind='order'``). The phone renders it to a bitmap (ESC/POS text mode cannot
+        shape Khmer), so every string is final here: translated and formatted.
+
+        :return: ``{'title', 'name', 'blocks': [...]}``; block types: text, separator, pair,
+            item, total, qr, feed
+        """
+        checkin = self.browse(int(checkin_id)).exists()
+        if not checkin:
+            raise UserError(_("This check-in no longer exists."))
+        checkin.check_access('read')
+        if kind == 'order':
+            order = self.env['sale.order'].browse(int(order_id or 0)).exists()
+            if not order or order.sudo().checkinme_checkin_id != checkin:
+                raise UserError(_("This sales order is not linked to the visit %s.", checkin.name))
+            order.check_access('read')
+            return checkin._receipt_order(order)
+        if kind != 'visit':
+            raise UserError(_("Unknown receipt type: %s", kind))
+        return checkin._receipt_visit()
+
+    def _receipt_header(self):
+        """Company letterhead blocks."""
+        company = self.company_id.sudo()
+        blocks = [{'type': 'text', 'text': company.name or '', 'align': 'center', 'size': 'l', 'bold': True}]
+        address = ', '.join(filter(None, [company.street, company.street2, company.city]))
+        contact = ' · '.join(filter(None, [company.phone, company.email]))
+        for line in (address, contact, company.website):
+            if line:
+                blocks.append({'type': 'text', 'text': line, 'align': 'center', 'size': 's'})
+        if company.vat:
+            blocks.append({'type': 'text', 'text': _("Tax ID: %s", company.vat), 'align': 'center', 'size': 's'})
+        blocks.append({'type': 'separator'})
+        return blocks
+
+    def _receipt_footer(self):
+        now = self._to_local(fields.Datetime.now())
+        return [
+            {'type': 'separator'},
+            {'type': 'text', 'text': _("Printed %s", now.strftime('%d %b %Y %H:%M')), 'align': 'center', 'size': 's'},
+            {'type': 'feed', 'lines': 3},
+        ]
+
+    @staticmethod
+    def _receipt_pair(left, right, bold=False):
+        return {'type': 'pair', 'left': left, 'right': right or '', 'bold': bold}
+
+    def _receipt_visit(self):
+        """Visit slip: where, when, who and what was agreed."""
+        self.ensure_one()
+        checkin_local = self._to_local(self.checkin_time)
+        checkout_local = self._to_local(self.checkout_time)
+        partner = self.partner_id
+        pair = self._receipt_pair
+        blocks = self._receipt_header()
+        blocks += [
+            {'type': 'text', 'text': _("VISIT SLIP"), 'align': 'center', 'size': 'm', 'bold': True},
+            {'type': 'text', 'text': self.name, 'align': 'center', 'size': 'm'},
+            {'type': 'separator'},
+        ]
+        if checkin_local:
+            blocks.append(pair(_("Date"), checkin_local.strftime('%d %b %Y')))
+            blocks.append(pair(_("Check-in"), checkin_local.strftime('%H:%M')))
+        if checkout_local:
+            blocks.append(pair(_("Check-out"), checkout_local.strftime('%H:%M')))
+        if self.duration:
+            hours, minutes = divmod(int(round(self.duration * 60)), 60)
+            blocks.append(pair(_("Duration"), "%dh %02dm" % (hours, minutes)))
+        blocks.append(pair(_("Salesperson"), self.employee_id.name))
+        blocks.append({'type': 'separator'})
+        if partner:
+            blocks.append(pair(_("Customer"), partner.display_name, bold=True))
+            phone = partner.phone or partner.mobile
+            if phone:
+                blocks.append(pair(_("Phone"), phone))
+            address = ' '.join((partner._display_address(without_company=True) or '').split())
+            if address:
+                blocks.append({'type': 'text', 'text': address, 'size': 's'})
+        blocks.append(pair(_("Activity"), self.checkin_type_id.name))
+        status = self._get_location_status_label()
+        if self.location_status in ('verified', 'far'):
+            status = "%s (%s)" % (status, self.env['checkinme.telegram']._format_distance(self.distance_to_partner))
+        if status:
+            blocks.append(pair(_("Location"), status))
+        if self.outcome:
+            outcome_labels = dict(self._fields['outcome']._description_selection(self.env))
+            blocks.append(pair(_("Outcome"), outcome_labels.get(self.outcome, '')))
+        if self.sale_amount:
+            blocks.append(pair(_("Sales"), formatLang(self.env, self.sale_amount, currency_obj=self.currency_id),
+                               bold=True))
+        if self.next_action_date:
+            blocks.append(pair(_("Follow-up"), format_date(self.env, self.next_action_date)))
+        for label, text in ((_("Purpose"), self.purpose), (_("Notes"), self.notes)):
+            if text and text.strip():
+                blocks.append({'type': 'separator'})
+                blocks.append({'type': 'text', 'text': label, 'bold': True})
+                blocks.append({'type': 'text', 'text': text.strip()})
+        if self.google_maps_url:
+            blocks.append({'type': 'separator'})
+            blocks.append({'type': 'qr', 'value': self.google_maps_url, 'size': QR_SIZE})
+            blocks.append({'type': 'text', 'text': _("Scan to open the location"), 'align': 'center', 'size': 's'})
+        blocks += self._receipt_footer()
+        return {'title': _("VISIT SLIP"), 'name': self.name, 'blocks': blocks}
+
+    def _receipt_order(self, order):
+        """Quotation / sales order receipt: one item per product line, then the totals."""
+        self.ensure_one()
+        currency = order.currency_id
+        pair = self._receipt_pair
+
+        def amount(value):
+            return formatLang(self.env, value, currency_obj=currency)
+
+        def number(value):
+            return formatLang(self.env, value, digits=0 if float(value).is_integer() else 2)
+
+        title = _("QUOTATION") if order.state in ('draft', 'sent') else _("SALES ORDER")
+        order_local = self._to_local(order.date_order)
+        blocks = self._receipt_header()
+        blocks += [
+            {'type': 'text', 'text': title, 'align': 'center', 'size': 'm', 'bold': True},
+            {'type': 'text', 'text': order.name, 'align': 'center', 'size': 'm'},
+            {'type': 'separator'},
+        ]
+        if order_local:
+            blocks.append(pair(_("Date"), order_local.strftime('%d %b %Y %H:%M')))
+        blocks.append(pair(_("Customer"), order.partner_id.display_name, bold=True))
+        if order.user_id:
+            blocks.append(pair(_("Salesperson"), order.user_id.name))
+        blocks.append(pair(_("Visit"), self.name))
+        blocks.append({'type': 'separator'})
+        for line in order.order_line:
+            if line.display_type == 'line_section':
+                blocks.append({'type': 'text', 'text': line.name or '', 'bold': True})
+            elif line.display_type:
+                blocks.append({'type': 'text', 'text': line.name or '', 'size': 's'})
+            else:
+                quantity = ' '.join(filter(None, [number(line.product_uom_qty), line.product_uom.name]))
+                detail = "%s × %s" % (quantity, amount(line.price_unit))
+                if line.discount:
+                    detail += " (-%s%%)" % number(line.discount)
+                blocks.append({
+                    'type': 'item',
+                    'name': line.name or line.product_id.display_name or '',
+                    'detail': detail,
+                    'amount': amount(line.price_subtotal),
+                })
+        blocks.append({'type': 'separator'})
+        blocks.append(pair(_("Untaxed Amount"), amount(order.amount_untaxed)))
+        blocks.append(pair(_("Taxes"), amount(order.amount_tax)))
+        blocks.append({'type': 'total', 'left': _("Total"), 'right': amount(order.amount_total)})
+        if order.payment_term_id:
+            blocks.append({'type': 'text', 'text': _("Payment terms: %s", order.payment_term_id.name), 'size': 's'})
+        blocks += self._receipt_footer()
+        return {'title': title, 'name': order.name, 'blocks': blocks}

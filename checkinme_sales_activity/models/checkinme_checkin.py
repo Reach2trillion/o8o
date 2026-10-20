@@ -332,6 +332,7 @@ class CheckinmeCheckin(models.Model):
         checked_in = records.filtered(lambda r: r.state == 'checked_in')
         checked_in._check_gps_required()
         checked_in._on_checked_in()
+        records.filtered(lambda r: r.state == 'draft')._push_planned_visit()
         return records
 
     def write(self, vals):
@@ -343,9 +344,14 @@ class CheckinmeCheckin(models.Model):
         watched = {'partner_id', 'checkin_time', 'state', 'company_id'}
         touched = bool(watched & set(vals))
         partners = self.partner_id if touched else self.env['res.partner']
+        previous_employees = {rec.id: rec.employee_id for rec in self} if 'employee_id' in vals else {}
         res = super().write(vals)
         if touched:
             self._recompute_new_customer_siblings(partners | self.partner_id)
+        if previous_employees:
+            # a planned visit (re)assigned to another salesperson: tell the new one
+            self.filtered(lambda r: r.state == 'draft' and r.employee_id != previous_employees.get(r.id)
+                          )._push_planned_visit()
         return res
 
     def unlink(self):
@@ -380,6 +386,7 @@ class CheckinmeCheckin(models.Model):
         for rec in self:
             rec._post_location_message('checkout')
             rec._notify_telegram('checkout')
+            rec._push_team_event('checkout')
         return True
 
     def action_cancel(self):
@@ -483,6 +490,7 @@ class CheckinmeCheckin(models.Model):
         for rec in self:
             rec._post_location_message('checkin')
             rec._notify_telegram('checkin')
+            rec._push_team_event('checkin')
 
     def _get_location_status_label(self):
         self.ensure_one()
@@ -551,6 +559,102 @@ class CheckinmeCheckin(models.Model):
             rec._send_telegram_event(rec.telegram_pending_event)
         if len(pending) >= limit:
             self._trigger_telegram_queue()
+        return True
+
+    # ------------------------------------------------------------------
+    # ABJ app push notifications (queued by checkinme.push, never blocking)
+    # ------------------------------------------------------------------
+    def _push_planned_visit(self):
+        """Tell the salesperson that someone else planned (or assigned) a visit for them."""
+        if not self or not self.env['checkinme.config']._get_bool('checkinme.push_planned_visit', True):
+            return
+        for rec in self:
+            try:
+                user = rec.sudo().employee_id.user_id
+                if not user or user == self.env.user:
+                    continue
+                rec_lang = rec.with_context(lang=user.lang or self.env.lang)
+                when = rec._to_local(rec.checkin_time)
+                body = ' · '.join(filter(None, [
+                    rec.sudo().partner_id.display_name or rec.checkin_type_id.name,
+                    when.strftime('%d %b %Y %H:%M') if when else '',
+                ]))
+                self.env['checkinme.push']._notify(
+                    user, rec_lang.env._("New visit planned"), body, event='planned_visit', record=rec)
+            except Exception:  # noqa: BLE001 - never block the business flow because of a notification
+                _logger.exception("Sale Check: planned visit push failed for %s", rec.name)
+
+    def _push_team_event(self, event):
+        """Check-in / check-out push to the salesperson's managers (setting, off by default:
+        Telegram already covers the managers)."""
+        self.ensure_one()
+        if not self.env['checkinme.config']._get_bool('checkinme.push_team_checkin', False):
+            return
+        try:
+            employee = self.sudo().employee_id
+            managers = (employee.parent_id.user_id | employee.department_id.manager_id.user_id) \
+                - employee.user_id - self.env.user
+            # only managers who may open the visit
+            managers = managers.filtered(lambda user: self.with_user(user).with_context(
+                allowed_company_ids=user.company_ids.ids).has_access('read'))
+            if not managers:
+                return
+            is_checkout = event == 'checkout'
+            for lang in set(managers.mapped('lang')):
+                rec = self.with_context(lang=lang or self.env.lang)
+                env = rec.env
+                if is_checkout:
+                    title = env._("%s checked out", employee.name)
+                    details = []
+                    if rec.duration:
+                        hours, minutes = divmod(int(round(rec.duration * 60)), 60)
+                        details.append("%dh %02dm" % (hours, minutes))
+                    if rec.outcome:
+                        details.append(dict(rec._fields['outcome']._description_selection(env)).get(rec.outcome, ''))
+                else:
+                    title = env._("%s checked in", employee.name)
+                    when = rec._to_local(rec.checkin_time)
+                    details = [when.strftime('%H:%M') if when else '']
+                    status = rec._get_location_status_label()
+                    if rec.location_status in ('verified', 'far'):
+                        distance = self.env['checkinme.telegram']._format_distance(rec.distance_to_partner)
+                        status = "%s (%s)" % (status, distance)
+                    details.append(status)
+                what = rec.sudo().partner_id.display_name or rec.checkin_type_id.name
+                body = ' · '.join(filter(None, [what] + details))
+                self.env['checkinme.push']._notify(
+                    managers.filtered(lambda user: (user.lang or self.env.lang) == (lang or self.env.lang)),
+                    title, body, event='team_checkout' if is_checkout else 'team_checkin', record=self)
+        except Exception:  # noqa: BLE001
+            _logger.exception("Sale Check: team %s push failed for %s", event, self.name)
+
+    @api.model
+    def _cron_push_followup_reminders(self):
+        """Morning push to every salesperson with follow-ups due today: "3 follow-ups today"."""
+        if not self.env['checkinme.config']._get_bool('checkinme.push_followup_reminder', True):
+            return False
+        Push = self.env['checkinme.push']
+        for company in self.env['res.company'].search([]):
+            today = self._get_today(company)
+            groups = self.sudo()._read_group([
+                ('company_id', '=', company.id),
+                ('state', '=', 'done'),
+                ('next_action_date', '=', today),
+                ('user_id', '!=', False),
+            ], ['user_id'], ['id:array_agg'])
+            for user, ids in groups:
+                visits = self.sudo().browse(sorted(ids))
+                env = visits.with_context(lang=user.lang or self.env.lang).env
+                count = len(visits)
+                title = env._("1 follow-up today") if count == 1 else env._("%s follow-ups today", count)
+                names = []
+                for visit in visits:
+                    name = visit.partner_id.display_name or visit.purpose or visit.name
+                    if name not in names:
+                        names.append(name)
+                body = ', '.join(names[:3]) + (' +%d' % (len(names) - 3) if len(names) > 3 else '')
+                Push.with_company(company)._notify(
+                    user, title, body, url='/odoo/abj', event='followup_reminder', tag='abj-followup-%s' % today)
         return True
 
     # ------------------------------------------------------------------

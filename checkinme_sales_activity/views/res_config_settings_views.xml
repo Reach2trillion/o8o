@@ -85,6 +85,59 @@
                         </setting>
                     </block>
 
+                    <!-- ABJ phone app -->
+                    <block title="ABJ Mobile App" name="checkinme_abj_setting_container">
+                        <setting id="checkinme_abj_install_setting" string="ABJ App"
+                                 help="Salespeople install ABJ from Sale Check &gt; Install on phone: on an iPhone (iOS 16.4 or later) open it in Safari and use Share &gt; Add to Home Screen; on Android open it in Chrome and tap Install. Notifications are then enabled from the app's Settings screen.">
+                            <div class="mt8">
+                                <button name="action_checkinme_test_push" type="object"
+                                        string="Send a test notification to me" class="btn-link" icon="fa-bell"/>
+                            </div>
+                        </setting>
+                        <setting id="checkinme_push_planned_visit_setting" string="Planned Visit Notifications"
+                                 help="Notify the salesperson on the phone when someone else plans a visit for them or assigns them a planned visit.">
+                            <field name="checkinme_push_planned_visit"/>
+                        </setting>
+                        <setting id="checkinme_push_followup_reminder_setting" string="Morning Follow-up Reminders"
+                                 help="Every morning at 08:00 (Phnom Penh time; editable under Settings &gt; Technical &gt; Scheduled Actions, Sale Check: ABJ Follow-up Reminders), remind each salesperson of the customer follow-ups due today.">
+                            <field name="checkinme_push_followup_reminder"/>
+                        </setting>
+                        <setting id="checkinme_push_team_checkin_setting" string="Team Check-in Notifications"
+                                 help="Also notify the salesperson's manager and department manager on their phone at each check-in and check-out (Telegram already reports them to the managers' group).">
+                            <field name="checkinme_push_team_checkin"/>
+                        </setting>
+                        <setting id="checkinme_push_odoo_messages_setting" string="Odoo Messages in the Android App"
+                                 help="Forward Odoo's own notifications (mentions, direct messages, assigned activities) to the ABJ Android app. Browsers and the installed web app already receive them from Odoo.">
+                            <field name="checkinme_push_odoo_messages"/>
+                        </setting>
+                        <setting id="checkinme_fcm_setting" string="Android App Notifications (Firebase)"
+                                 groups="base.group_system"
+                                 help="Only for the optional ABJ Android app. Upload the JSON key of a service account of the Firebase project used to build the app (Firebase console &gt; Project settings &gt; Service accounts &gt; Generate new private key). Never share this file.">
+                            <div class="content-group">
+                                <div class="row mt16" invisible="not checkinme_fcm_project_id">
+                                    <label for="checkinme_fcm_project_id" class="col-lg-4 o_light_label"/>
+                                    <field name="checkinme_fcm_project_id" nolabel="1" readonly="1"/>
+                                </div>
+                                <div class="row" invisible="not checkinme_fcm_project_id">
+                                    <label for="checkinme_fcm_client_email" class="col-lg-4 o_light_label"/>
+                                    <field name="checkinme_fcm_client_email" nolabel="1" readonly="1"/>
+                                </div>
+                                <div class="row mt8">
+                                    <label for="checkinme_fcm_service_account_file" class="col-lg-4 o_light_label"
+                                           string="Upload Key (JSON)"/>
+                                    <field name="checkinme_fcm_service_account_file" nolabel="1"
+                                           filename="checkinme_fcm_service_account_filename"/>
+                                    <field name="checkinme_fcm_service_account_filename" invisible="1"/>
+                                </div>
+                            </div>
+                            <div class="mt8" invisible="not checkinme_fcm_project_id">
+                                <button name="action_checkinme_clear_fcm" type="object" string="Remove Service Account"
+                                        class="btn-link text-danger" icon="fa-trash"
+                                        confirm="The Android app will stop receiving notifications. Continue?"/>
+                            </div>
+                        </setting>
+                    </block>
+
                     <!-- KPI -->
                     <block title="KPI" name="checkinme_kpi_setting_container">
                         <setting id="checkinme_sales_source_setting" string="Sales Results Source"

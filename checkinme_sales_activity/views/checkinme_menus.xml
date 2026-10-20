@@ -74,6 +74,12 @@
               action="action_checkinme_telegram_log"
               groups="checkinme_sales_activity.group_checkinme_manager"
               sequence="30"/>
+    <menuitem id="menu_checkinme_push_message"
+              name="Push Logs"
+              parent="menu_checkinme_reporting"
+              action="action_checkinme_push_message"
+              groups="checkinme_sales_activity.group_checkinme_manager"
+              sequence="40"/>
 
     <!-- Configuration -->
     <menuitem id="menu_checkinme_config"
@@ -91,5 +97,10 @@
               parent="menu_checkinme_config"
               action="action_checkinme_config_settings"
               sequence="20" groups="base.group_system"/>
+    <menuitem id="menu_checkinme_push_device"
+              name="ABJ App Devices"
+              parent="menu_checkinme_config"
+              action="action_checkinme_push_device"
+              sequence="30"/>
 
 </odoo>

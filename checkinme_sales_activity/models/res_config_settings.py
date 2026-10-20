@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
+import base64
+import binascii
+import json
+
 from odoo import api, fields, models, _
+from odoo.exceptions import AccessError, UserError
 from odoo.tools import str2bool
+
+from ..tools.fcm import clear_token_cache, parse_service_account
+from .checkinme_push import FCM_PARAM
 
 # Boolean settings that default to True cannot use ``config_parameter`` (an unchecked value is
 # stored as "absent" and the default silently re-applies), so they are handled manually.
@@ -13,12 +21,18 @@ BOOL_SETTINGS = {
     'checkinme_weekly_report': ('checkinme.weekly_report', True),
     'checkinme_monthly_report': ('checkinme.monthly_report', True),
     'checkinme_require_gps': ('checkinme.require_gps', True),
+    # ABJ app push notifications
+    'checkinme_push_planned_visit': ('checkinme.push_planned_visit', True),
+    'checkinme_push_followup_reminder': ('checkinme.push_followup_reminder', True),
+    'checkinme_push_team_checkin': ('checkinme.push_team_checkin', False),
+    'checkinme_push_odoo_messages': ('checkinme.push_odoo_messages', True),
 }
 
 CRON_FLAGS = {
     'checkinme_daily_report': 'checkinme_sales_activity.ir_cron_checkinme_daily_report',
     'checkinme_weekly_report': 'checkinme_sales_activity.ir_cron_checkinme_weekly_report',
     'checkinme_monthly_report': 'checkinme_sales_activity.ir_cron_checkinme_monthly_report',
+    'checkinme_push_followup_reminder': 'checkinme_sales_activity.ir_cron_checkinme_push_followup',
 }
 
 SALES_SOURCES = [
@@ -86,6 +100,27 @@ class ResConfigSettings(models.TransientModel):
         default='sale_order',
         help="How actual sales are measured against targets and in reports.")
 
+    # ABJ app
+    checkinme_push_planned_visit = fields.Boolean(string='Planned Visit Notifications')
+    checkinme_push_followup_reminder = fields.Boolean(string='Morning Follow-up Reminders')
+    checkinme_push_team_checkin = fields.Boolean(string='Team Check-in Notifications')
+    checkinme_push_odoo_messages = fields.Boolean(string='Odoo Messages in the Android App')
+    checkinme_fcm_service_account_file = fields.Binary(
+        string='Firebase Service Account Key', attachment=False, groups='base.group_system',
+        help="JSON key of a Firebase service account (Firebase console > Project settings > Service "
+             "accounts > Generate new private key). Only needed for the optional ABJ Android app.")
+    checkinme_fcm_service_account_filename = fields.Char(groups='base.group_system')
+    checkinme_fcm_project_id = fields.Char(
+        string='Firebase Project', compute='_compute_checkinme_fcm_info', groups='base.group_system')
+    checkinme_fcm_client_email = fields.Char(
+        string='Service Account', compute='_compute_checkinme_fcm_info', groups='base.group_system')
+
+    def _compute_checkinme_fcm_info(self):
+        info = self.env['checkinme.push']._get_fcm_service_account() or {}
+        for settings in self:
+            settings.checkinme_fcm_project_id = info.get('project_id', False)
+            settings.checkinme_fcm_client_email = info.get('client_email', False)
+
     @api.model
     def get_values(self):
         res = super().get_values()
@@ -103,6 +138,46 @@ class ResConfigSettings(models.TransientModel):
             cron = self.env.ref(cron_xmlid, raise_if_not_found=False)
             if cron:
                 cron.sudo().active = bool(self[fname])
+        self._set_checkinme_fcm_service_account()
+
+    def _set_checkinme_fcm_service_account(self):
+        """Validate and store an uploaded service account key (the field itself stays empty:
+        the private key is never sent back to the browser)."""
+        if not self.env.user.has_group('base.group_system'):
+            return
+        content = self.sudo().with_context(bin_size=False).checkinme_fcm_service_account_file
+        if not content:
+            return
+        try:
+            info = parse_service_account(base64.b64decode(content, validate=True))
+        except (ValueError, binascii.Error) as exc:
+            raise UserError(_("Invalid Firebase service account key: %s", exc))
+        self.env['ir.config_parameter'].sudo().set_param(FCM_PARAM, json.dumps(info))
+        clear_token_cache()
+
+    def action_checkinme_clear_fcm(self):
+        if not self.env.user.has_group('base.group_system'):
+            raise AccessError(_("Only administrators can remove the Firebase service account."))
+        self.env['ir.config_parameter'].sudo().set_param(FCM_PARAM, False)
+        clear_token_cache()
+        return {'type': 'ir.actions.client', 'tag': 'reload'}
+
+    def action_checkinme_test_push(self):
+        """Send a test notification to the current user's phones (browsers / PWA and app)."""
+        self.ensure_one()
+        self.set_values()
+        result = self.env['checkinme.push']._send_test_notification(self.env.user)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('ABJ notifications'),
+                'message': result['message'],
+                'type': {'sent': 'success', 'partial': 'warning', 'no_device': 'warning'}.get(
+                    result['state'], 'danger'),
+                'sticky': result['state'] != 'sent',
+            },
+        }
 
     def action_checkinme_test_telegram(self):
         self.ensure_one()
