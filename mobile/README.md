@@ -5,6 +5,10 @@
 Odoo server (`<ABJ_SERVER_URL>/odoo/abj`, module `checkinme_sales_activity`). Screens, check-ins, GPS
 and photos are the same web code as in the browser, so a server update reaches every phone without a new APK.
 
+For ABJ SkinCare the server is **`ABJ_SERVER_URL=https://abjskincare.com`**. Set it as the repository variable
+`ABJ_SERVER_URL` (see [Build in GitHub Actions](#build-in-github-actions)) before building: without it the APK
+opens the placeholder `https://erp.example.com` and is useless.
+
 The app adds what a browser cannot do well:
 
 | Feature | How |
@@ -20,9 +24,9 @@ and asks Android for the permissions.
 
 ## App or installed web app (PWA)?
 
-**Use the PWA first.** On iPhone it is the only option (Safari > Share > *Add to Home Screen*, iOS 16.4+), and on
-Android, Chrome > *Install* gives the same screens, web push and Bluetooth printing (Web Serial on Chrome 138+,
-Web Bluetooth for BLE printers) with nothing to build or update.
+**Use the PWA first** (*Sale Check > Install on phone* in Odoo). On iPhone it is the only option (Safari > Share >
+*Add to Home Screen*, iOS 16.4+), and on Android, Chrome > *Install* gives the same screens, web push and
+Bluetooth printing (Web Serial on Chrome 138+, Web Bluetooth for BLE printers) with nothing to build or update.
 
 Install the Android app instead when:
 
@@ -32,8 +36,9 @@ Install the Android app instead when:
   has been closed or put to sleep by battery optimisation;
 * the phone is a shared, kiosk-like device that should open straight on the sales screen, without browser UI.
 
-Do not install both on the same phone: it would receive every notification twice (web push to the PWA and
-FCM to the app). Uninstall one of them.
+Do not use the app on a phone where notifications are also enabled in Chrome for the same server (the ABJ PWA or
+any other Odoo page or web app of that server, which share one browser subscription): every notification would
+arrive twice (web push to Chrome and FCM to the app). Keep only one of them.
 
 ## Folder layout
 
@@ -56,7 +61,7 @@ Generated, not committed: `node_modules/`, `android/capacitor-cordova-android-pl
 
 | Variable | Used by | Default | Meaning |
 |---|---|---|---|
-| `ABJ_SERVER_URL` | `cap sync` | `https://erp.example.com` (placeholder, with a warning) | Origin of the Odoo server: scheme, host and optional port only. A trailing `/` is removed; a path, query or fragment is refused. Use `https` (plain `http` is accepted for local tests only; GPS does not work on `http`). |
+| `ABJ_SERVER_URL` | `cap sync` | `https://erp.example.com` (placeholder, with a warning) | Origin of the Odoo server, `https://abjskincare.com` for ABJ: scheme, host and optional port only. A trailing `/` is removed; a path, query or fragment is refused. Use `https` (plain `http` is accepted for local tests only; GPS does not work on `http`). |
 | `ABJ_APP_ID` | `cap sync`, Gradle | `com.abj.app` | Android `applicationId`. Must match the Firebase Android app. The Java package stays `com.abj.app`. |
 | `ABJ_APP_VERSION` | `cap sync`, Gradle | `version` of `package.json` | `versionName`, also sent in the user agent (`ABJApp/1.0.0`) |
 | `ABJ_VERSION_CODE` | Gradle | `1` | `versionCode` (must increase for every update installed over a previous one; CI uses the run number) |
@@ -74,7 +79,7 @@ Platform 36*.
 ```bash
 cd mobile
 npm ci
-export ABJ_SERVER_URL=https://erp.example.com     # your Odoo server
+export ABJ_SERVER_URL=https://abjskincare.com     # the Odoo server (ABJ)
 npx cap sync android                              # npm run sync
 npx cap open android                              # npm run open: Android Studio, then Run
 ```
@@ -122,14 +127,15 @@ base64 in the CI secret
 Android SDK, runs `npm ci`, `npx cap sync android` and `./gradlew assembleDebug`, and uploads the debug APK
 as the artifact `abj-debug-test-only-<run>` (a debuggable test build, see [Debug APKs](#debug-apks)). When
 the signing secrets exist it also builds `assembleRelease` and uploads `abj-release-<run>`, the APK to hand
-out; without them the run ends with a warning that only the test APK was built. The `versionCode` is the
+out; without them the run shows a warning that only the test APK was built. The `versionCode` is the
 run number.
 
-Repository settings (*Settings > Secrets and variables > Actions*), all optional:
+Repository settings (*Settings > Secrets and variables > Actions*). Only `ABJ_SERVER_URL` is needed for a useful
+APK (without it the run warns and the APK opens the placeholder `https://erp.example.com`); the others are optional:
 
 | Kind | Name | Value |
 |---|---|---|
-| Variable | `ABJ_SERVER_URL` | e.g. `https://erp.example.com` (the `server_url` input of a manual run overrides it) |
+| Variable | `ABJ_SERVER_URL` | `https://abjskincare.com` for ABJ (the `server_url` input of a manual run overrides it) |
 | Variable | `ABJ_APP_ID` | only if not `com.abj.app` |
 | Secret | `GOOGLE_SERVICES_JSON` | `base64 -w0 google-services.json` (macOS: `base64 -i google-services.json`) |
 | Secret | `ANDROID_KEYSTORE_BASE64` | `base64 -w0 abj-release.jks` |
@@ -162,9 +168,10 @@ one app id.
 6. **Give it to Odoo.** *Settings > Sale Check > ABJ Mobile App > Android App Notifications (Firebase)*: upload
    the JSON key and save; the project id is shown when it is valid.
 7. **Test.** Open the app on a phone, log in and allow notifications (Android 13+ asks once). The phone appears
-   under *Sale Check > Configuration > ABJ App Devices*. Then use *Send a test notification to me* (Odoo
-   settings, or the Settings screen of the app). Deliveries and errors are listed in *Sale Check > Reporting >
-   Push Logs*.
+   under *Sale Check > Configuration > ABJ App Devices*. Then use *Send test notification* in the app (gear icon >
+   *Notifications*; it targets this phone only and says whether *this device* was reached) or *Send a test
+   notification to me* in the Odoo settings (every device of the user). Deliveries and errors are listed in
+   *Sale Check > Reporting > Push Logs* (managers; copies of Odoo messages are visible to administrators only).
 
 Notifications use the channel `abj_default` ("ABJ", high importance) and the white map-pin status bar icon.
 Tapping one opens the related visit or record in the app.
@@ -178,21 +185,25 @@ as ESC/POS raster commands, which nearly all 58 mm and 80 mm thermal receipt pri
 
 1. Turn the printer on. On the phone: *Settings > Connected devices > Pair new device*, choose the printer
    (PIN usually `0000` or `1234`).
-2. In ABJ: gear icon > *Printer* > Bluetooth, *Choose printer*. Android 12+ asks for the *Nearby devices*
-   permission once. Paired devices are listed, likely printers first. BLE-only printers are not listed
-   (use the Chrome PWA, which supports them through Web Bluetooth).
+2. In ABJ: gear icon > *Printer* > *Bluetooth printer*. Android 12+ asks for the *Nearby devices* permission
+   once. The paired devices are listed under *Paired printers*, likely printers first: tap the printer (*Refresh
+   the list* after pairing a new one). BLE-only printers are not listed (use the Chrome PWA, which supports them
+   through Web Bluetooth).
 3. Pick the paper width (58 mm = 384 dots, 80 mm = 576 dots) and *Print test page*: it must show the Khmer
    line "សួស្តី ABJ" and a full-width ruler.
 
-**Network printers.** Give the printer a fixed IP address, then choose the network transport and enter the IP
+**Network printers.** Give the printer a fixed IP address, then choose *Network printer* and enter the IP
 (port 9100 unless the printer manual says otherwise). The phone must be on the same network.
 
-**System printing.** Uses the Android print dialog: Wi-Fi printers with a print service (Mopria, vendor
-plugins) or *Save as PDF*.
+**System printing.** *System print* uses the Android print dialog: Wi-Fi printers with a print service (Mopria,
+vendor plugins) or *Save as PDF*.
 
-Troubleshooting: *cannot connect* means the printer is off, out of range, or still connected to another phone
-(Bluetooth printers accept one connection at a time). *Permission denied*: allow *Nearby devices* under
-Android *Settings > Apps > ABJ > Permissions*. Garbled or cut lines: check the paper width setting.
+Troubleshooting: *Could not connect to the printer* means the printer is off, out of range, or still connected
+to another phone (Bluetooth printers accept one connection at a time; a Bluetooth connection attempt gives up
+after 30 s). *The printer stopped accepting data*: paper out or cover open; the job is aborted instead of
+blocking the app, print again.
+*ABJ is not allowed to use Bluetooth*: allow *Nearby devices* under Android *Settings > Apps > ABJ > Permissions*.
+Garbled or cut lines: check the paper width setting.
 
 ## Google Play
 
@@ -211,14 +222,18 @@ Android *Settings > Apps > ABJ > Permissions*. Garbled or cut lines: check the p
 
 ## Limitations
 
-* **Google sign-in does not work in the app:** Google blocks OAuth in embedded WebViews. Users log in with their
-  Odoo login and password (set one for users who only used Google so far).
-* **Do not install both the app and the PWA** on one phone: duplicate notifications (see above).
+* **Google and Telegram login are not expected to work in the app:** they open external pages, outside the
+  app's WebView, and Google blocks its sign-in page in embedded WebViews. Users log in with their Odoo login and
+  password (set one for users who only used Google or Telegram so far, e.g. `auth_telegram` on ABJ's server).
+* **No notifications in Chrome as well:** a phone with the app and Chrome notifications for the same server gets
+  every notification twice (see above).
 * Only pages of `ABJ_SERVER_URL` open inside the app; other links (Google Maps, websites) open in the browser.
 * The server must be reachable over HTTPS with a valid certificate; GPS needs HTTPS.
 * No iOS app: iPhones use the PWA.
-* Not yet tested on a physical phone: the CI build compiles the app, but check push, Bluetooth printing and
-  downloads on one real device of each model in use before handing the app out.
+* Not yet tested on a physical phone, with a real printer or with a real Firebase project: the CI build compiles
+  the app and the web side was tested in headless Chromium with a simulated Capacitor bridge, but check login,
+  push, Bluetooth / network printing and downloads on one real device of each model in use before handing the app
+  out (see [What was and was not tested](../checkinme_sales_activity/README.md#what-was-and-was-not-tested)).
 
 ## Maintenance
 
