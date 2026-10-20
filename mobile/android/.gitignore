@@ -55,6 +55,8 @@ captures/
 # Keystore files: release signing keys never go into the repository (CI decodes them from secrets)
 *.jks
 *.keystore
+# except the public, throwaway debug key (debug builds only, see mobile/README.md)
+!app/abj-debug.keystore
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

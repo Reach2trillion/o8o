@@ -23,7 +23,11 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.json.JSONObject;
 
 /**
@@ -41,6 +45,15 @@ final class AbjDownloads {
     private static final String TAG = "AbjDownloads";
     private static final String DEFAULT_MIME = "application/octet-stream";
     private static final String PACKAGE_MIME = "application/vnd.android.package-archive";
+    // Content-Disposition parameters: filename*=charset'language'percent-encoded, and filename="quoted" or token
+    private static final Pattern DISPOSITION_EXTENDED_NAME = Pattern.compile(
+        "filename\\*\\s*=\\s*([^']*)'[^']*'([^;\\s]+)",
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern DISPOSITION_NAME = Pattern.compile(
+        "filename\\s*=\\s*(?:\"((?:\\\\.|[^\"\\\\])*)\"|([^;\\s]+))",
+        Pattern.CASE_INSENSITIVE
+    );
 
     /** Installed once per document by AbjWebViewClient.onPageFinished. */
     static final String SHIM_JS =
@@ -107,7 +120,7 @@ final class AbjDownloads {
         @Override
         public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
             try {
-                String fileName = safeFileName(URLUtil.guessFileName(url, contentDisposition, mimeType), mimeType);
+                String fileName = safeFileName(dispositionFileName(url, contentDisposition, mimeType), mimeType);
                 if (url.startsWith("blob:") || url.startsWith("data:")) {
                     // Normally caught earlier by SHIM_JS; read it in the page while the blob still exists.
                     String name = contentDisposition != null && !contentDisposition.isEmpty() ? fileName : "";
@@ -225,6 +238,37 @@ final class AbjDownloads {
                 Logger.error(TAG, "Cannot open " + saved.fileName, e);
             }
         });
+    }
+
+    /**
+     * File name of a download: the {@code filename*} (RFC 6266 / 5987) or {@code filename} parameter of its
+     * Content-Disposition, else {@link URLUtil#guessFileName}. Odoo sends only {@code filename*=UTF-8''...},
+     * which guessFileName ignores before Android 15: it would save /web/content/123 as "123.pdf".
+     */
+    static String dispositionFileName(String url, String contentDisposition, String mimeType) {
+        if (contentDisposition != null) {
+            Matcher extended = DISPOSITION_EXTENDED_NAME.matcher(contentDisposition);
+            if (extended.find()) {
+                String charset = extended.group(1).trim();
+                try {
+                    // percent-encoded: a "+" is a plus sign, not a space
+                    String name = URLDecoder.decode(extended.group(2).replace("+", "%2B"), charset.isEmpty() ? "UTF-8" : charset);
+                    if (!name.trim().isEmpty()) {
+                        return name;
+                    }
+                } catch (UnsupportedEncodingException | IllegalArgumentException e) {
+                    // unknown charset or bad escape: try the plain form
+                }
+            }
+            Matcher plain = DISPOSITION_NAME.matcher(contentDisposition);
+            if (plain.find()) {
+                String name = plain.group(1) != null ? plain.group(1).replaceAll("\\\\(.)", "$1") : plain.group(2);
+                if (!name.trim().isEmpty()) {
+                    return name;
+                }
+            }
+        }
+        return URLUtil.guessFileName(url, contentDisposition, mimeType);
     }
 
     static String safeFileName(String requested, String mimeType) {

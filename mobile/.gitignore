@@ -5,6 +5,8 @@ google-services.json
 *-firebase-adminsdk-*.json
 *.jks
 *.keystore
+# except the public, throwaway debug key (debug builds only)
+!android/app/abj-debug.keystore
 
 # Build outputs
 *.apk
