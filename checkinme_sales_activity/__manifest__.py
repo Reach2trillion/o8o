@@ -18,7 +18,7 @@ Mobile-friendly sales activity management and tracking for outside sales teams.
 * Performance Reports: daily, weekly, monthly and yearly results per employee
   (pivot / graph analysis, printable PDF activity report).
 """,
-    'version': '18.0.1.0.0',
+    'version': '18.0.1.1.0',
     'category': 'Sales/Sales',
     'author': 'Reach2trillion',
     'website': 'https://github.com/Reach2trillion/o8o',

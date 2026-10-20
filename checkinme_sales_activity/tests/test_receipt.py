@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests of the receipt documents printed by the phone and of the ABJ additions to the phone
 screen RPCs."""
+import babel.dates
+
 from odoo import Command
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import new_test_user, tagged
@@ -162,6 +164,46 @@ class TestReceipts(CheckinmeCommon):
         # once confirmed it is a sales order
         order.action_confirm()
         self.assertEqual(Checkin.mobile_get_receipt(visit.id, kind='order', order_id=order.id)['title'], 'SALES ORDER')
+
+    def test_cancelled_order_is_not_printed(self):
+        """server-correctness-4: a cancelled quotation is neither offered nor printed as a sales order."""
+        visit = self._visit_done()
+        order = self._create_confirmed_order(self.rep, partner=self.khmer_partner, checkinme_checkin_id=visit.id)
+        Checkin = self._rep_model()
+        self.assertEqual([o['id'] for o in Checkin.mobile_get_checkin(visit.id)['sale_orders']], [order.id])
+        order._action_cancel()
+        self.assertEqual(order.state, 'cancel')
+        self.assertEqual(Checkin.mobile_get_checkin(visit.id)['sale_orders'], [])
+        with self.assertRaisesRegex(UserError, 'cancelled'):
+            Checkin.mobile_get_receipt(visit.id, kind='order', order_id=order.id)
+
+    def test_order_receipt_precisions(self):
+        """server-correctness-5: quantities and unit prices use the configured precisions."""
+        self.env.ref('product.decimal_product_uom').digits = 3
+        self.env.ref('product.decimal_price').digits = 3
+        visit = self._visit_done()
+        order = self.env['sale.order'].with_context(**MAIL_CONTEXT).create({
+            'partner_id': self.khmer_partner.id, 'user_id': self.rep.id, 'checkinme_checkin_id': visit.id,
+            'order_line': [Command.create({'product_id': self.product.id, 'name': 'Rice (kg)',
+                                           'product_uom_qty': 0.125, 'price_unit': 0.125})],
+        })
+        doc = self._rep_model().mobile_get_receipt(visit.id, kind='order', order_id=order.id)
+        item = next(block for block in doc['blocks'] if block['type'] == 'item')
+        uom = order.order_line.product_uom.name
+        price = formatLang(self.env, 0.125, dp='Product Price', currency_obj=order.currency_id)
+        self.assertEqual(item['detail'], '0.125 %s × %s' % (uom, price))
+        self.assertIn('0.125', price)
+
+    def test_receipt_dates_in_the_user_language(self):
+        """C5: receipt dates use the month names of the user's language."""
+        self.env['res.lang']._activate_lang('km_KH')
+        visit = self._visit_done()
+        english = self._pairs(self._rep_model().with_context(lang='en_US').mobile_get_receipt(visit.id))
+        khmer = self._pairs(self._rep_model().with_context(lang='km_KH').mobile_get_receipt(visit.id))
+        local = visit._to_local(visit.checkin_time)
+        self.assertEqual(english['Date'], local.strftime('%d %b %Y'))
+        self.assertIn(babel.dates.format_date(local.date(), 'dd MMM y', locale='km_KH'), khmer.values())
+        self.assertNotIn(english['Date'], khmer.values())
 
     def test_receipt_access(self):
         Checkin = self._rep_model()

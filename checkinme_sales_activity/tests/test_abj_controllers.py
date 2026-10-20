@@ -117,17 +117,17 @@ class TestAbjWebApp(HttpCase):
         code = """
             const start = Date.now();
             (function check() {
-                const screen = document.querySelector('.o_checkinme_screen');
-                if (screen && !document.querySelector('.o_checkinme_loading')) {
+                const loaded = document.querySelector('.o_checkinme_screen')
+                    && !document.querySelector('.o_checkinme_loading');
+                // the web client removes its navbar right after the full screen action is mounted
+                if (loaded && !document.querySelector('.o_main_navbar')) {
                     if (!location.pathname.startsWith('/odoo/abj')) {
                         console.error('unexpected URL ' + location.pathname);
-                    } else if (document.querySelector('.o_main_navbar')) {
-                        console.error('the ABJ screen should be full screen');
                     } else {
                         console.log('test successful');
                     }
                 } else if (Date.now() - start > 30000) {
-                    console.error('the ABJ screen did not load');
+                    console.error(loaded ? 'the ABJ screen should be full screen' : 'the ABJ screen did not load');
                 } else {
                     setTimeout(check, 100);
                 }

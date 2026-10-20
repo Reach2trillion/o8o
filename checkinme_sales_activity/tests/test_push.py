@@ -11,13 +11,16 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from markupsafe import Markup
 
-from odoo import fields
+from odoo import Command, api, fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import new_test_user, tagged
 from odoo.tools import mute_logger
 
 from odoo.addons.checkinme_sales_activity.tools import fcm
-from odoo.addons.checkinme_sales_activity.models.checkinme_push import CheckinmePush
+from odoo.addons.checkinme_sales_activity.models import checkinme_push
+from odoo.addons.checkinme_sales_activity.models.checkinme_push import (
+    MAX_ATTEMPTS, MAX_BODY_LENGTH, MAX_DEVICES_PER_USER, CheckinmePush,
+)
 
 from .common import MAIL_CONTEXT
 from .push_common import (
@@ -84,12 +87,88 @@ class TestPushDevices(PushCommon):
         with self.assertRaises(AccessError):
             self.Device.with_user(portal).register_device('portal-token')
         self.assertFalse(self.Device.sudo().search([('token', '=', 'portal-token')]))
-        # salespeople never read the device table directly; managers do
-        self._add_native_device(self.rep, token='managed-token')
+        # salespeople never read the device table directly; managers do, without the token
+        device = self._add_native_device(self.rep, token='managed-token')
         with self.assertRaises(AccessError):
             self.Device.with_user(self.rep).search([])
-        self.assertEqual(self.Device.with_user(self.manager).search([('token', '=', 'managed-token')]).user_id,
-                         self.rep)
+        self.assertEqual(self.Device.with_user(self.manager).search([('user_id', '=', self.rep.id)]), device)
+        with self.assertRaises(AccessError):
+            device.with_user(self.manager).read(['token'])
+        with self.assertRaises(AccessError):
+            self.Device.with_user(self.manager).search([('token', '=', 'managed-token')])
+        self.assertEqual(device.with_user(self.manager).display_name, 'Galaxy A15')
+
+    def test_managers_cannot_redirect_devices(self):
+        """server-security-1: a manager may archive a phone, never give it to another user."""
+        result = self.Device.with_user(self.manager).register_device('mgr-phone-token', device_name='Mgr phone')
+        device = self.Device.with_user(self.manager).browse(result['id'])
+        for vals in ({'user_id': self.other_rep.id}, {'token': 'other-token'}, {'device_name': 'x', 'active': True}):
+            with self.assertRaises(AccessError):
+                api.call_kw(self.Device.with_user(self.manager), 'write', [[device.id], vals], {})
+        self.assertEqual(device.sudo().user_id, self.manager)
+        self.assertEqual(device.sudo().token, 'mgr-phone-token')
+        # a direct message to other_rep never reaches the manager's phone
+        self._configure_fcm()
+        self._add_native_device(self.other_rep, token='other-rep-token')
+        chat = self.env['discuss.channel'].with_user(self.rep).channel_get([self.other_rep.partner_id.id])
+        chat.with_user(self.rep).message_post(body='PRIVATE 9999', message_type='comment',
+                                              subtype_xmlid='mail.mt_comment')
+        self.Push._cron_send_push_queue()
+        tokens = [kwargs['json']['message']['token'] for _url, kwargs in self.session.calls_to(FCM_SEND_URL)]
+        self.assertEqual(tokens, ['other-rep-token'])
+
+    def test_managers_only_see_devices_of_their_companies(self):
+        company_b = self.env['res.company'].create({'name': 'ABJ Siem Reap'})
+        user_b = new_test_user(self.env, login='checkinme_test_user_b', groups='base.group_user',
+                               company_id=company_b.id, company_ids=[Command.set(company_b.ids)],
+                               context=MAIL_CONTEXT)
+        device_b = self._add_native_device(user_b, token='company-b-token')
+        device_a = self._add_native_device(self.rep, token='company-a-token')
+        found = self.Device.with_user(self.manager).search([('id', 'in', (device_a | device_b).ids)])
+        self.assertEqual(found, device_a)
+
+    def test_archived_phone_stays_archived(self):
+        """requirements-archived-device-reactivates: a phone archived by a manager (lost phone) is not
+        reactivated by the app of the same user."""
+        Device = self.Device.with_user(self.rep)
+        device = self.Device.sudo().browse(Device.register_device('lost-phone', device_name='Redmi 13')['id'])
+        device.with_user(self.manager).action_archive()
+        self.assertEqual((device.active, device.blocked), (False, True))
+        self.assertEqual(Device.register_device('lost-phone', device_name='Redmi 13'),
+                         {'id': device.id, 'active': False})
+        self.assertFalse(device.active)
+        self.assertFalse(self.Push._notify(self.rep, 'Hello', 'Nobody', native_only=True))
+        # unarchived by the manager: it works again
+        device.with_user(self.manager).action_unarchive()
+        self.assertEqual((device.active, device.blocked), (True, False))
+        device.with_user(self.manager).action_archive()
+        # another user logs in on the phone: it is theirs now
+        self.assertEqual(self.Device.with_user(self.other_rep).register_device('lost-phone'),
+                         {'id': device.id, 'active': True})
+        self.assertEqual((device.user_id, device.blocked), (self.other_rep, False))
+        # an owner's logout is not a block
+        self.Device.with_user(self.other_rep).unregister_device('lost-phone')
+        self.assertEqual((device.active, device.blocked), (False, False))
+        self.assertTrue(self.Device.with_user(self.other_rep).register_device('lost-phone')['active'])
+
+    def test_active_devices_per_user_are_capped(self):
+        """server-security-4: one user cannot register an unbounded number of phones."""
+        Device = self.Device.with_user(self.rep)
+        for index in range(MAX_DEVICES_PER_USER + 2):
+            Device.register_device('flood-token-%d' % index)
+            # each registration is older than the next one
+            self.env.cr.execute("UPDATE checkinme_push_device SET last_seen = last_seen - interval '1 hour' "
+                                "WHERE user_id = %s", (self.rep.id,))
+            self.env.invalidate_all()
+        active = self.Device.sudo().search([('user_id', '=', self.rep.id)])
+        self.assertEqual(len(active), MAX_DEVICES_PER_USER)
+        tokens = active.mapped('token')
+        self.assertNotIn('flood-token-0', tokens)
+        self.assertNotIn('flood-token-1', tokens)
+        self.assertIn('flood-token-%d' % (MAX_DEVICES_PER_USER + 1), tokens)
+        # an old phone that registers again is the newest one
+        Device.register_device('flood-token-0')
+        self.assertIn('flood-token-0', self.Device.sudo().search([('user_id', '=', self.rep.id)]).mapped('token'))
 
 
 @tagged('post_install', '-at_install')
@@ -211,7 +290,7 @@ class TestWebPushSending(PushCommon):
         _device, browser_key, auth = self._add_web_device(self.rep)
         message = self.Push._notify(self.rep, 'ABJ test notification', 'Hi', event='test')
         result = self.Push._send_message(message)
-        self.assertEqual(result, {'web': 1, 'native': 0, 'state': 'sent', 'error': ''})
+        self.assertEqual(result, {'web': 1, 'native': 0, 'devices': 1, 'state': 'sent', 'error': ''})
         _url, kwargs = self.session.calls[0]
         self.assertEqual(kwargs['headers']['TTL'], '3600')
         payload = decrypt_web_push(kwargs['data'], browser_key, auth)
@@ -301,13 +380,30 @@ class TestWebPushSending(PushCommon):
     def test_retry_button(self):
         self._add_web_device(self.rep)
         message = self.Push._notify(self.rep, 'Hello', 'Body')
-        message.write({'state': 'failed', 'error': 'old error'})
+        message.write({'state': 'failed', 'error': 'old error', 'attempt_count': 1})
         with self.assertRaises(AccessError):
             message.with_user(self.rep).action_retry()
         message.with_user(self.manager).action_retry()
-        self.assertEqual((message.state, message.error), ('pending', False))
+        self.assertEqual((message.state, message.error, message.attempt_count), ('pending', False, 0))
         self.Push._cron_send_push_queue()
+        self.assertEqual((message.state, message.attempt_count), ('sent', 1))
+        # a message already sent is not sent again
+        triggers = self._cron_triggers()
+        message.with_user(self.manager).action_retry()
         self.assertEqual(message.state, 'sent')
+        self.assertEqual(self._cron_triggers(), triggers)
+
+    def test_retry_respects_the_company_rule(self):
+        """server-security-5: the ids given to action_retry go through the record rules."""
+        company_b = self.env['res.company'].create({'name': 'ABJ Siem Reap'})
+        self._add_web_device(self.rep)
+        message = self.Push._notify(self.rep, 'B notification', 'b body')
+        message.write({'company_id': company_b.id, 'state': 'failed'})
+        Message = self.Message.with_user(self.manager)
+        self.assertFalse(Message.search([('id', '=', message.id)]))
+        with self.assertRaises(AccessError):
+            api.call_kw(Message, 'action_retry', [[message.id]], {})
+        self.assertEqual(message.state, 'failed')
 
     def test_push_log_access(self):
         self._add_web_device(self.rep)
@@ -315,6 +411,53 @@ class TestWebPushSending(PushCommon):
         self.assertEqual(self.Message.with_user(self.manager).search([('id', '=', message.id)]), message)
         with self.assertRaises(AccessError):
             self.Message.with_user(self.rep).search([])
+        # copies of Odoo messages: administrators only (server-security-2)
+        odoo_message = self.Push._notify(self.rep, 'Chan Sophea', 'PRIVATE', event='odoo_message')
+        self.assertFalse(self.Message.with_user(self.manager).search([('id', '=', odoo_message.id)]))
+        with self.assertRaises(AccessError):
+            odoo_message.with_user(self.manager).read(['body'])
+        with self.assertRaises(AccessError):
+            odoo_message.with_user(self.manager).action_retry()
+        admin = self.env.ref('base.user_admin')
+        self.assertEqual(self.Message.with_user(admin).search([('id', '=', odoo_message.id)]), odoo_message)
+
+    def test_attempts_and_interrupted_messages(self):
+        """server-security-4: a message that keeps killing the worker is given up, the others go."""
+        self._add_web_device(self.rep)
+        stuck = self.Push._notify(self.rep, 'Stuck', 'Body')
+        stuck.attempt_count = MAX_ATTEMPTS  # the worker was killed while sending it, 3 times
+        message = self.Push._notify(self.rep, 'Hello', 'Body')
+        self.Push._cron_send_push_queue()
+        self.assertEqual(stuck.state, 'failed')
+        self.assertIn('interrupted', stuck.error)
+        self.assertEqual((message.state, message.attempt_count), ('sent', 1))
+        self.assertEqual(len(self.session.calls), 1, "the stuck message is not sent again")
+
+    def test_time_budget(self):
+        self._add_web_device(self.rep)
+        messages = self.Push._notify(self.rep, 'First', 'Body') | self.Push._notify(self.rep, 'Second', 'Body')
+        triggers = self._cron_triggers()
+        with patch.object(checkinme_push, 'QUEUE_TIME_BUDGET', -1):
+            self.Push._cron_send_push_queue()
+        self.assertEqual(messages.mapped('state'), ['sent', 'pending'], "at least one message per run")
+        self.assertEqual(self._cron_triggers(), triggers + 1, "the next run sends the rest")
+        self.Push._cron_send_push_queue()
+        self.assertEqual(messages.mapped('state'), ['sent', 'sent'])
+
+    @mute_logger(WEB_PUSH_LOGGER)
+    def test_invalid_endpoints_are_never_called(self):
+        """server-security-3: the server only posts to https push services on public host names."""
+        bad = [self._add_web_device(self.rep, endpoint)[0] for endpoint in (
+            'http://push.example.com/send/1', 'https://127.0.0.1:8069/web', 'https://[::1]/x',
+            'https://10.0.0.5/internal', 'https://localhost/x', 'https://intranet/x', 'https://db.internal/x',
+            'https://push.example.com:99999/x')]
+        good, _key, _auth = self._add_web_device(self.rep, 'https://fcm.googleapis.com/fcm/send/abc')
+        message = self.Push._notify(self.rep, 'Hello', 'Body')
+        self.Push._cron_send_push_queue()
+        self.assertEqual(self.session.urls(), ['https://fcm.googleapis.com/fcm/send/abc'])
+        self.assertTrue(good.exists())
+        self.assertFalse(any(device.exists() for device in bad))
+        self.assertEqual((message.state, message.web_push_count), ('partial', 1))
 
 
 @tagged('post_install', '-at_install')
@@ -472,6 +615,33 @@ class TestFcmSending(PushCommon):
         self.Push._cron_send_push_queue()
         self.assertEqual((message.state, message.web_push_count, message.native_count), ('sent', 1, 1))
 
+    def test_long_message_fits_in_fcm_limit(self):
+        """server-correctness-1: FCM refuses messages over 4096 bytes (Khmer: 3 bytes a character)."""
+        self._configure_fcm()
+        self._add_native_device(self.rep, token='rep-app-token')
+        visit = self._create_checkin(self.rep)
+        visit.with_user(self.manager).message_post(
+            body='សូមទូរស័ព្ទទៅអតិថិជនវិញ ' * 400, partner_ids=self.rep.partner_id.ids,
+            message_type='comment', subtype_xmlid='mail.mt_comment')
+        message = self._messages(event='odoo_message')
+        self.assertLessEqual(len(message.body), MAX_BODY_LENGTH)
+        self.Push._cron_send_push_queue()
+        payload = self.session.calls_to(FCM_SEND_URL)[0][1]['json']
+        # under the limit both in UTF-8 and as the escaped JSON sent by requests
+        self.assertLess(len(json.dumps(payload, ensure_ascii=False).encode()), 4096)
+        self.assertLess(len(json.dumps(payload).encode()), 4096)
+        body = payload['message']['notification']['body']
+        self.assertTrue(body.startswith('សូមទូរស័ព្ទ'))
+        self.assertTrue(body.endswith('…'))
+        self.assertLessEqual(len(body.encode()), fcm.MAX_BODY_BYTES)
+        self.assertEqual(message.state, 'sent')
+        # the helper cuts on a character boundary
+        self.assertEqual(fcm.clip_utf8('ABC', 3), 'ABC')
+        self.assertEqual(fcm.clip_utf8('កខគឃ', 9), 'កខ…')
+        self.assertEqual(fcm.clip_utf8(None, 10), '')
+        title = fcm.FcmClient(self.service_account).build_message('t', 'ក' * 300, '')['message']['notification']['title']
+        self.assertLessEqual(len(title.encode()), fcm.MAX_TITLE_BYTES)
+
     def test_parse_service_account(self):
         info = fcm.parse_service_account(json.dumps(self.service_account).encode())
         self.assertEqual(info['project_id'], FCM_PROJECT)
@@ -528,6 +698,18 @@ class TestPushHooks(PushCommon):
         })
         self.assertEqual(self._messages(event='planned_visit')[-1].body,
                          '%s · 21 Oct 2026 09:30' % self.type_other.name)
+
+    def test_planned_visit_in_the_user_language(self):
+        """C5: the date of the push follows the salesperson's language."""
+        self.env['res.lang']._activate_lang('km_KH')
+        self.rep.partner_id.lang = 'km_KH'
+        self._add_web_device(self.rep)
+        self._manager_checkin_model().create({
+            'employee_id': self.rep_employee.id, 'partner_id': self.partner_geo.id,
+            'checkin_type_id': self.type_visit.id, 'state': 'draft',
+            'checkin_time': '2026-10-21 02:30:00',  # 09:30 in Phnom Penh
+        })
+        self.assertEqual(self._messages(event='planned_visit').body, 'Phnom Penh Mart · 21 តុលា 2026 09:30')
 
     def test_planned_visit_self_created_or_disabled(self):
         self._add_web_device(self.rep)
@@ -602,6 +784,54 @@ class TestPushHooks(PushCommon):
         message = self._messages(event='team_checkin')
         self.assertEqual(message.user_ids, self.manager,
                          "the department manager cannot open the visit (not a Sale Check manager)")
+
+    def test_team_checkin_manager_without_language(self):
+        """server-correctness-2: one notification per manager, even when one has no language."""
+        self._set_param('checkinme.push_team_checkin', 'True')
+        department = self.env['hr.department'].create({'name': 'Phnom Penh Sales',
+                                                       'manager_id': self.other_rep_employee.id})
+        self.rep_employee.department_id = department
+        self.rep_employee.parent_id = self.manager_employee
+        self.other_rep.write({'groups_id': [Command.link(
+            self.env.ref('checkinme_sales_activity.group_checkinme_manager').id)]})
+        self.manager.partner_id.lang = 'en_US'
+        self.other_rep.partner_id.lang = False
+        self.assertFalse(self.other_rep.lang)
+        self._add_web_device(self.manager)
+        self._add_web_device(self.other_rep)
+        # checked in from a request in English
+        self.env['checkinme.checkin'].with_user(self.rep).with_context(MAIL_CONTEXT, lang='en_US').create({
+            'employee_id': self.rep_employee.id, 'partner_id': self.partner_geo.id,
+            'checkin_type_id': self.type_visit.id, 'latitude': 11.5565, 'longitude': 104.9283})
+        messages = self._messages(event='team_checkin')
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages.user_ids, self.manager | self.other_rep)
+
+    def test_followup_reminder_across_companies(self):
+        """server-correctness-3: one reminder per salesperson, with the follow-ups of all companies
+        (two reminders with the same tag would replace each other on the phone)."""
+        company_b = self.env['res.company'].create({'name': 'ABJ Siem Reap'})
+        company_b.partner_id.tz = 'Asia/Phnom_Penh'
+        self.rep.write({'company_ids': [Command.link(company_b.id)]})
+        employee_b = self.env['hr.employee'].create({
+            'name': 'Sok Dara', 'user_id': self.rep.id, 'company_id': company_b.id, 'tz': 'Asia/Phnom_Penh'})
+        shop_b = self.env['res.partner'].create({'name': 'Siem Reap Shop', 'is_company': True})
+        today = self._today()
+        self._add_web_device(self.rep)
+        visit_a = self._create_checkin(self.rep)
+        visit_a.write({'next_action_date': today})
+        visit_a.action_check_out()
+        visit_b = self.env['checkinme.checkin'].with_context(**MAIL_CONTEXT).create({
+            'employee_id': employee_b.id, 'company_id': company_b.id, 'partner_id': shop_b.id,
+            'checkin_type_id': self.type_visit.id, 'latitude': 11.5565, 'longitude': 104.9283,
+            'next_action_date': today})
+        visit_b.action_check_out()
+        self.env['checkinme.checkin']._cron_push_followup_reminders()
+        message = self._messages(event='followup_reminder')
+        self.assertEqual(len(message), 1)
+        self.assertEqual(message.user_ids, self.rep)
+        self.assertEqual(message.name, '2 follow-ups today')
+        self.assertEqual(message.body, 'Phnom Penh Mart, Siem Reap Shop')
 
     def test_followup_reminders(self):
         today = self._today()
@@ -685,7 +915,10 @@ class TestPushMailMirror(PushCommon):
         # browsers got it from mail: our queue only talks to Google
         self.assertEqual(self.session.urls(), [fcm.TOKEN_URL, FCM_SEND_URL])
         self.assertEqual(self.session.calls[1][1]['json']['message']['token'], 'rep-app-token')
+        self.assertEqual(self.session.calls[1][1]['json']['message']['notification']['body'],
+                         'Please call *Phnom Penh Mart* back')
         self.assertEqual((message.state, message.web_push_count, message.native_count), ('sent', 0, 1))
+        self.assertFalse(message.body, "the copy of the message is not kept once delivered")
 
     def test_mirror_disabled_and_author_excluded(self):
         self._add_native_device(self.rep)
@@ -707,6 +940,20 @@ class TestPushMailMirror(PushCommon):
         self.assertEqual(len(message), 1)
         self.assertEqual(message.url, '/odoo/action-mail.action_discuss?active_id=discuss.channel_%d' % chat.id)
         self.assertEqual(message.body, 'Hello Dara')
+
+    def test_private_messages_hidden_from_managers(self):
+        """server-security-2: a Sale Check manager cannot read other people's chats in the push log."""
+        self.Device.with_user(self.other_rep).register_device('other-rep-token')
+        chat = self.env['discuss.channel'].with_user(self.rep).channel_get([self.other_rep.partner_id.id])
+        message = chat.with_user(self.rep).message_post(body='TOPSECRET ' + 'x' * 5000, message_type='comment',
+                                                        subtype_xmlid='mail.mt_comment')
+        with self.assertRaises(AccessError):
+            message.with_user(self.manager).read(['body'])
+        self.assertFalse(self.Message.with_user(self.manager).search_read(
+            [('event', '=', 'odoo_message')], ['body']))
+        row = self._messages(event='odoo_message')
+        self.assertTrue(row.body.startswith('TOPSECRET'))
+        self.assertLessEqual(len(row.body), MAX_BODY_LENGTH)
 
     @mute_logger('odoo.addons.checkinme_sales_activity.models.mail_thread')
     def test_mirror_failure_does_not_break_posting(self):
@@ -750,10 +997,22 @@ class TestPushSettings(PushCommon):
         settings.execute()
         stored = json.loads(self._get_param('checkinme.fcm_service_account'))
         self.assertEqual(stored['client_email'], self.service_account['client_email'])
+        # E2E B4: the uploaded key does not stay in the settings table
+        self.env.flush_all()
+        self.env.cr.execute("SELECT checkinme_fcm_service_account_file, checkinme_fcm_service_account_filename "
+                            "FROM res_config_settings WHERE id = %s", (settings.id,))
+        self.assertEqual(self.env.cr.fetchone(), (None, None))
         settings = self._settings()
         self.assertEqual(settings.checkinme_fcm_project_id, FCM_PROJECT)
         self.assertEqual(settings.checkinme_fcm_client_email, self.service_account['client_email'])
         self.assertFalse(settings.checkinme_fcm_service_account_file, "the key is never sent back")
+        # E2E B1: the settings form (onchange) shows the configured project; the form holds
+        # company_id (base_setup), the only field with a default these fields depend on
+        values = self.env['res.config.settings'].with_user(self.admin).onchange({}, [], {
+            'company_id': {'fields': {}}, 'checkinme_fcm_project_id': {}, 'checkinme_fcm_client_email': {},
+        })['value']
+        self.assertEqual(values['checkinme_fcm_project_id'], FCM_PROJECT)
+        self.assertEqual(values['checkinme_fcm_client_email'], self.service_account['client_email'])
         self.assertTrue(self.env['checkinme.checkin'].with_user(self.rep).mobile_get_dashboard()['app']['push']['native_ready'])
         # saving the settings again without a new file keeps it
         settings.execute()
@@ -799,9 +1058,53 @@ class TestPushSettings(PushCommon):
         self.assertEqual((result['web'], result['native'], result['state']), (1, 0, 'sent'))
         self.assertIn('Sent to 1 browser/PWA device(s)', result['message'])
         self.assertEqual(self._messages(event='test').user_ids, self.rep)
-        # a failure is reported, not raised
-        self.session.handler = lambda url, kwargs: FakeResponse(400, text='bad request')
-        with mute_logger(WEB_PUSH_LOGGER):
+        self.assertIsNone(result['this_device'])
+        # a failure is reported, not raised, and the raw answer of the push service stays in the log
+        self.session.handler = lambda url, kwargs: FakeResponse(400, text='bad request db_password=hunter2')
+        with mute_logger(WEB_PUSH_LOGGER, PUSH_LOGGER):
             result = Checkin.mobile_send_test_push()
         self.assertEqual(result['state'], 'failed')
-        self.assertIn('400', result['message'])
+        self.assertIn('1 device(s) could not be reached', result['message'])
+        for raw in ('400', 'hunter2', 'Web push'):
+            self.assertNotIn(raw, result['message'])
+        self.assertIn('hunter2', self._messages(event='test')[-1].error)
+
+    @mute_logger(PUSH_LOGGER)
+    def test_test_push_to_this_device(self):
+        """C3 / requirements-test-push-misleading: the phone asks for a test on itself."""
+        Checkin = self.env['checkinme.checkin'].with_user(self.rep)
+        desktop, _key, _auth = self._add_web_device(self.rep, 'https://push.example.com/send/desktop')
+        # this phone is not registered: nothing is sent to the desktop browser
+        result = Checkin.mobile_send_test_push(endpoint='https://push.example.com/send/phone')
+        self.assertEqual((result['this_device'], result['state'], result['web']), (False, 'no_device', 0))
+        self.assertIn('not registered', result['message'])
+        self.assertFalse(self.session.calls)
+        # somebody else's subscription is not this user's device
+        self._add_web_device(self.other_rep, 'https://push.example.com/send/other')
+        self.assertFalse(Checkin.mobile_send_test_push(endpoint='https://push.example.com/send/other')['this_device'])
+        self.assertFalse(self.session.calls)
+        # the registered phone only
+        self._add_web_device(self.rep, 'https://push.example.com/send/phone')
+        result = api.call_kw(Checkin, 'mobile_send_test_push', [], {'endpoint': 'https://push.example.com/send/phone'})
+        self.assertEqual((result['this_device'], result['state'], result['web'], result['native']),
+                         (True, 'sent', 1, 0))
+        self.assertEqual(self.session.urls(), ['https://push.example.com/send/phone'])
+        self.assertEqual(result['message'], 'Test notification sent to this device.')
+        # the push service refuses it
+        self.session.handler = lambda url, kwargs: FakeResponse(500, text='internal: 10.1.2.3:5432')
+        with mute_logger(WEB_PUSH_LOGGER):
+            result = Checkin.mobile_send_test_push(endpoint='https://push.example.com/send/phone')
+        self.assertFalse(result['this_device'])
+        self.assertNotIn('10.1.2.3', result['message'])
+        self.assertIn('could not be reached', result['message'])
+        self.session.handler = None
+        # the Android app: its FCM token
+        self._configure_fcm()
+        self._add_native_device(self.rep, token='rep-app-token')
+        self.session.calls.clear()
+        result = Checkin.mobile_send_test_push(token='rep-app-token')
+        self.assertEqual((result['this_device'], result['web'], result['native']), (True, 0, 1))
+        self.assertEqual(self.session.urls(), [fcm.TOKEN_URL, FCM_SEND_URL])
+        self.assertFalse(Checkin.mobile_send_test_push(token='unknown-token')['this_device'])
+        self.assertFalse(Checkin.mobile_send_test_push(token=['not', 'a', 'string'])['this_device'])
+        self.assertTrue(desktop.exists())

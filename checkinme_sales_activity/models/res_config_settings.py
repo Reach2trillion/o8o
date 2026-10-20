@@ -115,6 +115,8 @@ class ResConfigSettings(models.TransientModel):
     checkinme_fcm_client_email = fields.Char(
         string='Service Account', compute='_compute_checkinme_fcm_info', groups='base.group_system')
 
+    # company_id has a default: the settings form (onchange) recomputes these when it opens
+    @api.depends('company_id')
     def _compute_checkinme_fcm_info(self):
         info = self.env['checkinme.push']._get_fcm_service_account() or {}
         for settings in self:
@@ -141,8 +143,9 @@ class ResConfigSettings(models.TransientModel):
         self._set_checkinme_fcm_service_account()
 
     def _set_checkinme_fcm_service_account(self):
-        """Validate and store an uploaded service account key (the field itself stays empty:
-        the private key is never sent back to the browser)."""
+        """Validate and store an uploaded service account key. The uploaded file is then cleared
+        from the settings record: the private key is only kept in the system parameter and never
+        sent back to the browser."""
         if not self.env.user.has_group('base.group_system'):
             return
         content = self.sudo().with_context(bin_size=False).checkinme_fcm_service_account_file
@@ -153,6 +156,8 @@ class ResConfigSettings(models.TransientModel):
         except (ValueError, binascii.Error) as exc:
             raise UserError(_("Invalid Firebase service account key: %s", exc))
         self.env['ir.config_parameter'].sudo().set_param(FCM_PARAM, json.dumps(info))
+        self.sudo().write({'checkinme_fcm_service_account_file': False,
+                           'checkinme_fcm_service_account_filename': False})
         clear_token_cache()
 
     def action_checkinme_clear_fcm(self):
