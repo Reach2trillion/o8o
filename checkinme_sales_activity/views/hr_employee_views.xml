@@ -17,7 +17,7 @@
                 </button>
             </xpath>
             <xpath expr="//page[@name='hr_settings']/group" position="inside">
-                <group string="CheckinMe" name="checkinme_settings">
+                <group string="Check In" name="checkinme_settings">
                     <field name="checkinme_telegram_chat_id" placeholder="e.g. 123456789"/>
                 </group>
             </xpath>

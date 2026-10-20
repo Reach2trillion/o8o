@@ -71,7 +71,7 @@ export class CheckinmeGeolocationField extends Component {
                 }
             } catch (error) {
                 // Never let the widget break the form.
-                console.warn("CheckinMe geolocation: automatic capture skipped", error);
+                console.warn("Check In geolocation: automatic capture skipped", error);
             }
         });
         onWillUnmount(() => {
@@ -203,7 +203,7 @@ export class CheckinmeGeolocationField extends Component {
                 break;
             default:
                 message = _t("The GPS position could not be captured. Please try again.");
-                console.warn("CheckinMe geolocation: capture failed", error);
+                console.warn("Check In geolocation: capture failed", error);
         }
         if (!this.isUnmounted) {
             this.state.error = message;
@@ -215,7 +215,7 @@ export class CheckinmeGeolocationField extends Component {
         try {
             this.notification.add(message, { type: "warning", title });
         } catch (error) {
-            console.warn("CheckinMe geolocation: could not display notification", error);
+            console.warn("Check In geolocation: could not display notification", error);
         }
     }
 }

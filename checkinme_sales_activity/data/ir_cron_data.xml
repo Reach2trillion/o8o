@@ -4,7 +4,7 @@
         <!-- Telegram notification queue: triggered right after each check-in / check-out,
              swept hourly as a safety net. -->
         <record id="ir_cron_checkinme_telegram_queue" model="ir.cron">
-            <field name="name">CheckinMe: Send Queued Telegram Notifications</field>
+            <field name="name">Check In: Send Queued Telegram Notifications</field>
             <field name="model_id" ref="model_checkinme_checkin"/>
             <field name="state">code</field>
             <field name="code">model._cron_send_pending_telegram()</field>
@@ -18,7 +18,7 @@
              timezone (daily 18:00, weekly Monday 09:00, monthly 1st 09:00 local). -->
         <!-- Daily report: every day at 11:00 UTC (18:00 Asia/Phnom_Penh). Adjust "Next Execution Date" as needed. -->
         <record id="ir_cron_checkinme_daily_report" model="ir.cron">
-            <field name="name">CheckinMe: Daily Telegram Activity Report</field>
+            <field name="name">Check In: Daily Telegram Activity Report</field>
             <field name="model_id" ref="model_checkinme_telegram"/>
             <field name="state">code</field>
             <field name="code">model._cron_daily_report()</field>
@@ -31,7 +31,7 @@
 
         <!-- Weekly report: every Monday at 02:00 UTC (09:00 Asia/Phnom_Penh) for the previous week. -->
         <record id="ir_cron_checkinme_weekly_report" model="ir.cron">
-            <field name="name">CheckinMe: Weekly Telegram Activity Report</field>
+            <field name="name">Check In: Weekly Telegram Activity Report</field>
             <field name="model_id" ref="model_checkinme_telegram"/>
             <field name="state">code</field>
             <field name="code">model._cron_weekly_report()</field>
@@ -44,7 +44,7 @@
 
         <!-- Monthly report: 1st of every month at 02:00 UTC for the previous month. -->
         <record id="ir_cron_checkinme_monthly_report" model="ir.cron">
-            <field name="name">CheckinMe: Monthly Telegram Activity Report</field>
+            <field name="name">Check In: Monthly Telegram Activity Report</field>
             <field name="model_id" ref="model_checkinme_telegram"/>
             <field name="state">code</field>
             <field name="code">model._cron_monthly_report()</field>

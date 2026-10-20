@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Shared fixtures for the CheckinMe Sales Activity tests.
+"""Shared fixtures for the Check In Sales Activity tests.
 
 Every test class inherits :class:`CheckinmeCommon`, which sets up a Cambodian company
 (Asia/Phnom_Penh), three users (a salesperson, a manager and a second salesperson that is
@@ -202,7 +202,7 @@ class CheckinmeCommon(TransactionCase):
 
         # --- product used for sales orders ---------------------------------
         cls.product = cls.env['product.product'].create({
-            'name': 'CheckinMe Test Product',
+            'name': 'Check In Test Product',
             'type': 'consu',
             'list_price': 100.0,
             'taxes_id': [Command.clear()],

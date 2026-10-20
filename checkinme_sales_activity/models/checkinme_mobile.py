@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""RPC helpers behind the CheckinMe phone screen (client action ``checkinme_sales_activity.screen``).
+"""RPC helpers behind the Check In phone screen (client action ``checkinme_sales_activity.screen``).
 
 Every tap on the screen writes real records through the regular ORM methods, so access rights,
 record rules, GPS verification and Telegram notifications behave exactly as in the backend views.

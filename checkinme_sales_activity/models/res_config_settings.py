@@ -30,7 +30,7 @@ SALES_SOURCES = [
 class CheckinmeConfig(models.AbstractModel):
     """Typed accessors for the module's system parameters."""
     _name = 'checkinme.config'
-    _description = 'CheckinMe Configuration Helper'
+    _description = 'Check In Configuration Helper'
 
     @api.model
     def _get_param(self, key, default=False):

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'CheckinMe Sales Activity',
+    'name': 'Check In Sales Activity',
     'summary': 'GPS check-ins, customer visits, monthly KPI targets and Telegram reports for outside sales teams',
     'description': """
-CheckinMe Sales Activity System
+Check In Sales Activity System
 ===============================
 Mobile-friendly sales activity management and tracking for outside sales teams.
 

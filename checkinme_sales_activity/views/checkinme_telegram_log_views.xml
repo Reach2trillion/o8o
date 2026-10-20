@@ -116,7 +116,7 @@
             <p>
                 Every check-in notification and periodic report sent through the Telegram bot is
                 logged here with the API response, so you can troubleshoot delivery problems.
-                Configure the bot token and the managers' chat under CheckinMe &gt; Configuration &gt; Settings.
+                Configure the bot token and the managers' chat under Check In &gt; Configuration &gt; Settings.
             </p>
         </field>
     </record>

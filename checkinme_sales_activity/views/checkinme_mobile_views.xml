@@ -2,7 +2,7 @@
 <odoo>
     <!-- Phone screen: a dedicated OWL client action (JS / CSS in the lazy bundle checkinme_sales_activity.assets_screen) -->
     <record id="action_checkinme_screen" model="ir.actions.client">
-        <field name="name">CheckinMe</field>
+        <field name="name">Check In</field>
         <field name="tag">checkinme_sales_activity.screen</field>
         <field name="target">current</field>
     </record>
@@ -10,7 +10,7 @@
     <!-- "Install on phone": Odoo's scoped-app page installs the screen as a standalone app (PWA) -->
     <record id="action_checkinme_install" model="ir.actions.act_url">
         <field name="name">Install on phone</field>
-        <field name="url">/scoped_app?app_id=checkinme_sales_activity&amp;app_name=CheckinMe&amp;path=odoo/action-checkinme_sales_activity.action_checkinme_screen</field>
+        <field name="url">/scoped_app?app_id=checkinme_sales_activity&amp;app_name=Check%20In&amp;path=odoo/action-checkinme_sales_activity.action_checkinme_screen</field>
         <field name="target">self</field>
     </record>
 

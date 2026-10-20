@@ -3,14 +3,14 @@
 
     <!-- Root -->
     <menuitem id="menu_checkinme_root"
-              name="CheckinMe"
+              name="Check In"
               sequence="25"
               web_icon="checkinme_sales_activity,static/description/icon.png"
               groups="checkinme_sales_activity.group_checkinme_user"/>
 
     <!-- Phone-first entry points (same pattern as a quick-order screen): the screen is the first menu -->
     <menuitem id="menu_checkinme_screen"
-              name="Check In"
+              name="New check-in"
               parent="menu_checkinme_root"
               action="action_checkinme_screen"
               sequence="1"/>
