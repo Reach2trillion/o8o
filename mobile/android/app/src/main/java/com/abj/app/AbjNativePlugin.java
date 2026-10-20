@@ -42,6 +42,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 /**
@@ -50,10 +57,12 @@ import java.util.regex.Pattern;
  * Receipts are rasterised by the web client (ESC/POS {@code GS v 0} bands, base64), so this plugin only
  * moves bytes: Bluetooth Classic SPP, raw TCP (port 9100) and the Android print framework for the page.
  *
- * Every blocking call runs on one background thread (prints are serialised), and every method rejects
- * with a {@code code} instead of throwing: an uncaught exception here would crash the whole app.
+ * Prints run one at a time on their own background thread, each blocking step under a {@link Deadline}
+ * so that a printer that stops reading cannot block it; device listing and downloads use another thread
+ * and never wait behind a print. Every method rejects with a {@code code} instead of throwing: an
+ * uncaught exception here would crash the whole app.
  * Rejection codes: NO_BLUETOOTH, BLUETOOTH_OFF, PERMISSION_DENIED, INVALID_ARGUMENT, CONNECT_FAILED,
- * WRITE_FAILED, UNAVAILABLE, NATIVE_ERROR.
+ * WRITE_FAILED, TIMEOUT (the printer stopped accepting data), UNAVAILABLE, NATIVE_ERROR.
  */
 @CapacitorPlugin(
     name = "AbjNative",
@@ -67,26 +76,36 @@ public class AbjNativePlugin extends Plugin {
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
     private static final int MAX_PRINT_BYTES = 16 * 1024 * 1024;
     private static final int MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024;
+    // RFCOMM connect() has no timeout of its own: both attempts (secure, then insecure) must end within this.
+    private static final long SPP_CONNECT_TIMEOUT_MS = 30000;
+    // Extra time of a Bluetooth print on top of its transfer time (network prints use their timeoutMs).
+    private static final long SPP_WRITE_GRACE_MS = 10000;
+    // Slowest transfer accepted before a print is aborted: 4 KB/s, far below the speed of any receipt printer.
+    private static final long MIN_BYTES_PER_MS = 4;
     private static final Pattern PRINTER_NAME_HINT = Pattern.compile(
         "print|thermal|receipt|\\bpos|mtp|mpt|rpp|\\bpt-?\\d|xp-|zj-|gp-|bt-?58|bt-?80|58mm|80mm|innerprinter|tm-|spp-r|goojprt|munbyn|rongta|bixolon|sunmi",
         Pattern.CASE_INSENSITIVE
     );
 
-    private ExecutorService io;
+    private ExecutorService printer; // printBluetooth, printTcp: one job at a time
+    private ExecutorService io; // listPrinters, saveDownload
+    private ScheduledExecutorService watchdog; // Deadline timers
 
     @Override
     public void load() {
-        io = Executors.newSingleThreadExecutor((runnable) -> {
-            Thread thread = new Thread(runnable, "AbjNativeIO");
-            thread.setDaemon(true);
-            return thread;
-        });
+        printer = Executors.newSingleThreadExecutor(daemonThreads("AbjNativePrint"));
+        io = Executors.newSingleThreadExecutor(daemonThreads("AbjNativeIO"));
+        ScheduledThreadPoolExecutor timers = new ScheduledThreadPoolExecutor(1, daemonThreads("AbjNativeWatchdog"));
+        timers.setRemoveOnCancelPolicy(true); // a finished job does not keep its socket referenced until its timer is due
+        watchdog = timers;
     }
 
     @Override
     protected void handleOnDestroy() {
-        if (io != null) {
-            io.shutdownNow();
+        for (ExecutorService executor : new ExecutorService[] { printer, io, watchdog }) {
+            if (executor != null) {
+                executor.shutdownNow();
+            }
         }
     }
 
@@ -174,7 +193,7 @@ public class AbjNativePlugin extends Plugin {
                 requestPermissionForAlias(BLUETOOTH, call, "bluetoothPermissionCallback");
                 return;
             }
-            runIo(call, () -> {
+            runIo(io, call, () -> {
                 BluetoothAdapter adapter = requireEnabledAdapter();
                 JSObject result = new JSObject();
                 result.put("devices", bondedPrinters(adapter));
@@ -203,7 +222,7 @@ public class AbjNativePlugin extends Plugin {
                 requestPermissionForAlias(BLUETOOTH, call, "bluetoothPermissionCallback");
                 return;
             }
-            runIo(call, () -> {
+            runIo(printer, call, () -> {
                 BluetoothAdapter adapter = requireEnabledAdapter();
                 writeSpp(adapter, address, data, chunkSize, chunkDelayMs);
                 JSObject result = new JSObject();
@@ -259,21 +278,27 @@ public class AbjNativePlugin extends Plugin {
             }
         }
         BluetoothSocket socket = connectSpp(adapter.getRemoteDevice(address));
-        try {
-            OutputStream out = socket.getOutputStream();
-            for (int offset = 0; offset < data.length; offset += chunkSize) {
-                out.write(data, offset, Math.min(chunkSize, data.length - offset));
-                if (chunkDelayMs > 0) {
-                    out.flush();
-                    Thread.sleep(chunkDelayMs);
+        long chunks = (data.length + chunkSize - 1L) / chunkSize;
+        int drainMs = Math.min(2000, data.length / 16);
+        // A printer that stops reading (paper out, cover open) blocks write() until the deadline closes the socket.
+        try (Deadline sending = new Deadline(transferBudgetMs(data.length, SPP_WRITE_GRACE_MS) + chunks * chunkDelayMs + drainMs)) {
+            sending.watch(socket);
+            try {
+                OutputStream out = socket.getOutputStream();
+                for (int offset = 0; offset < data.length; offset += chunkSize) {
+                    out.write(data, offset, Math.min(chunkSize, data.length - offset));
+                    if (chunkDelayMs > 0) {
+                        out.flush();
+                        Thread.sleep(chunkDelayMs);
+                    }
                 }
+                out.flush();
+                // The socket write returns before the printer has received everything: closing right away
+                // truncates the end of the receipt on many models.
+                Thread.sleep(drainMs);
+            } catch (IOException e) {
+                throw writeFailed(sending, e);
             }
-            out.flush();
-            // The socket write returns before the printer has received everything: closing right away
-            // truncates the end of the receipt on many models.
-            Thread.sleep(Math.min(2000, data.length / 16));
-        } catch (IOException e) {
-            throw new AbjException("WRITE_FAILED", "Sending to the printer failed: " + e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AbjException("WRITE_FAILED", "Printing was interrupted");
@@ -286,17 +311,23 @@ public class AbjNativePlugin extends Plugin {
     @SuppressLint("MissingPermission") // see bondedPrinters
     private BluetoothSocket connectSpp(BluetoothDevice device) throws AbjException {
         IOException lastError = null;
-        for (boolean secure : new boolean[] { true, false }) {
-            BluetoothSocket socket = null;
-            try {
-                socket = secure
-                    ? device.createRfcommSocketToServiceRecord(SPP_UUID)
-                    : device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
-                socket.connect();
-                return socket;
-            } catch (IOException e) {
-                lastError = e;
-                closeQuietly(socket);
+        try (Deadline connecting = new Deadline(SPP_CONNECT_TIMEOUT_MS)) {
+            for (boolean secure : new boolean[] { true, false }) {
+                BluetoothSocket socket = null;
+                try {
+                    socket = secure
+                        ? device.createRfcommSocketToServiceRecord(SPP_UUID)
+                        : device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
+                    connecting.watch(socket); // close() from another thread aborts a blocked connect()
+                    socket.connect();
+                    return socket;
+                } catch (IOException e) {
+                    lastError = e;
+                    closeQuietly(socket);
+                }
+                if (connecting.expired()) {
+                    throw new AbjException("CONNECT_FAILED", "Cannot connect to the printer (timed out): is it on, in range and paired?");
+                }
             }
         }
         String reason = lastError != null && lastError.getMessage() != null ? ": " + lastError.getMessage() : "";
@@ -325,7 +356,7 @@ public class AbjNativePlugin extends Plugin {
             if (data == null) {
                 return;
             }
-            runIo(call, () -> {
+            runIo(printer, call, () -> {
                 writeTcp(host, port, data, timeoutMs);
                 JSObject result = new JSObject();
                 result.put("bytes", data.length);
@@ -344,14 +375,18 @@ public class AbjNativePlugin extends Plugin {
             } catch (IOException | IllegalArgumentException e) {
                 throw new AbjException("CONNECT_FAILED", "Cannot connect to " + host + ":" + port + ": " + e.getMessage());
             }
-            try {
-                socket.setSoTimeout(timeoutMs);
-                socket.setTcpNoDelay(true);
-                OutputStream out = socket.getOutputStream();
-                out.write(data);
-                out.flush();
-            } catch (IOException e) {
-                throw new AbjException("WRITE_FAILED", "Sending to the printer failed: " + e.getMessage());
+            // write() has no timeout of its own (setSoTimeout only bounds reads): a printer that accepted the
+            // connection and then stopped reading (paper out, cover open) would block it for ever.
+            try (Deadline sending = new Deadline(transferBudgetMs(data.length, timeoutMs))) {
+                sending.watch(socket);
+                try {
+                    socket.setTcpNoDelay(true);
+                    OutputStream out = socket.getOutputStream();
+                    out.write(data);
+                    out.flush();
+                } catch (IOException e) {
+                    throw writeFailed(sending, e);
+                }
             }
         } finally {
             closeQuietly(socket);
@@ -431,7 +466,7 @@ public class AbjNativePlugin extends Plugin {
             }
             final String fileName = call.getString("fileName", "");
             final String mimeType = call.getString("mimeType", "");
-            runIo(call, () -> {
+            runIo(io, call, () -> {
                 AbjDownloads.Saved saved;
                 try {
                     saved = AbjDownloads.save(getContext(), data, fileName, mimeType);
@@ -469,10 +504,69 @@ public class AbjNativePlugin extends Plugin {
         }
     }
 
-    /** Runs a task on the IO thread; any failure (even an Error) rejects the call instead of killing the app. */
-    private void runIo(PluginCall call, IoTask task) {
+    /**
+     * Watchdog of one blocking step of a print. When it expires it closes the watched socket from the
+     * watchdog thread, which makes a blocked connect() or write() fail at once; {@link #expired()} then
+     * tells the timeout apart from a lost connection.
+     */
+    private final class Deadline implements AutoCloseable {
+
+        private final AtomicBoolean expired = new AtomicBoolean();
+        private final AtomicReference<Closeable> watched = new AtomicReference<>();
+        private final ScheduledFuture<?> timer;
+
+        Deadline(long delayMs) {
+            timer = watchdog.schedule(this::expire, delayMs, TimeUnit.MILLISECONDS);
+        }
+
+        /** Closes {@code socket} when the deadline expires (at once if it already has). */
+        void watch(Closeable socket) {
+            watched.set(socket);
+            if (expired.get()) {
+                closeQuietly(socket);
+            }
+        }
+
+        boolean expired() {
+            return expired.get();
+        }
+
+        private void expire() {
+            expired.set(true);
+            closeQuietly(watched.get());
+        }
+
+        @Override
+        public void close() {
+            timer.cancel(false);
+        }
+    }
+
+    /** Time a print may take once connected: {@code graceMs} plus its size sent at {@link #MIN_BYTES_PER_MS}. */
+    private static long transferBudgetMs(int bytes, long graceMs) {
+        return graceMs + bytes / MIN_BYTES_PER_MS;
+    }
+
+    /** TIMEOUT when the deadline closed the socket (the printer stopped reading), else WRITE_FAILED. */
+    private static AbjException writeFailed(Deadline deadline, IOException error) {
+        if (deadline.expired()) {
+            return new AbjException("TIMEOUT", "The printer stopped accepting data. Check its paper and cover, then print again.");
+        }
+        return new AbjException("WRITE_FAILED", "The connection to the printer was lost while printing: " + error.getMessage());
+    }
+
+    private static ThreadFactory daemonThreads(String name) {
+        return (runnable) -> {
+            Thread thread = new Thread(runnable, name);
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    /** Runs a task on a background thread; any failure (even an Error) rejects the call instead of killing the app. */
+    private void runIo(ExecutorService executor, PluginCall call, IoTask task) {
         try {
-            io.execute(() -> {
+            executor.execute(() -> {
                 try {
                     task.run();
                 } catch (AbjException e) {

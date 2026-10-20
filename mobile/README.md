@@ -49,7 +49,8 @@ FCM to the app). Uninstall one of them.
 
 Generated, not committed: `node_modules/`, `android/capacitor-cordova-android-plugins/`,
 `android/app/src/main/assets/{public,capacitor.config.json,capacitor.plugins.json}`, build outputs,
-`google-services.json` and keystores. `npx cap sync android` recreates the generated files.
+`google-services.json` and keystores (except the public test key `android/app/abj-debug.keystore`, see
+[Debug APKs](#debug-apks)). `npx cap sync android` recreates the generated files.
 
 ## Build settings
 
@@ -60,6 +61,7 @@ Generated, not committed: `node_modules/`, `android/capacitor-cordova-android-pl
 | `ABJ_APP_VERSION` | `cap sync`, Gradle | `version` of `package.json` | `versionName`, also sent in the user agent (`ABJApp/1.0.0`) |
 | `ABJ_VERSION_CODE` | Gradle | `1` | `versionCode` (must increase for every update installed over a previous one; CI uses the run number) |
 | `ABJ_KEYSTORE_FILE`, `ABJ_KEYSTORE_PASSWORD`, `ABJ_KEY_ALIAS`, `ABJ_KEY_PASSWORD` | Gradle | none | release signing; without them `assembleRelease` produces an unsigned APK |
+| `ABJ_DEBUG_KEYSTORE_FILE` | Gradle | `android/app/abj-debug.keystore` | debug signing key (alias `androiddebugkey`, store and key password `android`), see [Debug APKs](#debug-apks) |
 
 The server URL is written into the APK by `npx cap sync` (`android/app/src/main/assets/capacitor.config.json`):
 run the sync again after changing it. One APK serves one Odoo server.
@@ -92,13 +94,36 @@ without it the app works with notifications disabled.
 Debug builds allow remote debugging of the WebView: open `chrome://inspect` on a computer with the phone
 connected over USB.
 
+### Debug APKs
+
+Debug APKs are **test builds only, never hand them out**. They are debuggable: anyone with USB access to the
+phone can inspect the WebView (`chrome://inspect`) and read the app data (`adb run-as`), Odoo session included.
+They are signed with `android/app/abj-debug.keystore`, a throwaway key committed on purpose (alias
+`androiddebugkey`, store and key password `android`, like Android's own debug key) so that every debug build,
+local or from CI, installs over the previous one and keeps the login. This key is public: give users a release
+APK signed with your own key (see [Google Play](#google-play)). A phone that has a debug APK signed with another
+key (an older CI build, or Android Studio's `~/.android/debug.keystore`) must uninstall it once.
+
+To sign debug builds with a private key instead, create one with the same alias and passwords:
+
+```bash
+keytool -genkeypair -keystore abj-debug-private.keystore -storepass android -alias androiddebugkey \
+  -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+```
+
+and pass its path (absolute, or relative to `android/app`) in `ABJ_DEBUG_KEYSTORE_FILE` (local builds) or its
+base64 in the CI secret
+`ANDROID_DEBUG_KEYSTORE_BASE64`.
+
 ## Build in GitHub Actions
 
 `.github/workflows/abj-android.yml` runs on every push that touches `mobile/**` (or the workflow) and on demand
 (*Actions > ABJ Android app > Run workflow*, optional input `server_url`). It installs Node 22, JDK 21 and the
-Android SDK, runs `npm ci`, `npx cap sync android` and `./gradlew assembleDebug`, and uploads the APK as the
-artifact `abj-debug-<run>`. When the signing secrets exist it also builds `assembleRelease` and uploads
-`abj-release-<run>`. The `versionCode` is the run number.
+Android SDK, runs `npm ci`, `npx cap sync android` and `./gradlew assembleDebug`, and uploads the debug APK
+as the artifact `abj-debug-test-only-<run>` (a debuggable test build, see [Debug APKs](#debug-apks)). When
+the signing secrets exist it also builds `assembleRelease` and uploads `abj-release-<run>`, the APK to hand
+out; without them the run ends with a warning that only the test APK was built. The `versionCode` is the
+run number.
 
 Repository settings (*Settings > Secrets and variables > Actions*), all optional:
 
@@ -109,6 +134,7 @@ Repository settings (*Settings > Secrets and variables > Actions*), all optional
 | Secret | `GOOGLE_SERVICES_JSON` | `base64 -w0 google-services.json` (macOS: `base64 -i google-services.json`) |
 | Secret | `ANDROID_KEYSTORE_BASE64` | `base64 -w0 abj-release.jks` |
 | Secret | `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | the keystore password, key alias and key password |
+| Secret | `ANDROID_DEBUG_KEYSTORE_BASE64` | optional private debug key: `base64 -w0 abj-debug-private.keystore` (see [Debug APKs](#debug-apks)) |
 
 Without `GOOGLE_SERVICES_JSON` the build still succeeds (push disabled, with a warning). Secrets are written to
 the runner only for the build and deleted afterwards; they are never committed.

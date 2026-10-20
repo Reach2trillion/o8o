@@ -5,7 +5,11 @@
 #   variable ABJ_APP_ID             Android applicationId (default com.abj.app)
 #   secret   GOOGLE_SERVICES_JSON   base64 of the Firebase google-services.json (push notifications)
 #   secrets  ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
-#                                   release signing; without them only the debug APK is built
+#                                   release signing; without them only the debug APK (debuggable, for tests) is built
+#   secret   ANDROID_DEBUG_KEYSTORE_BASE64
+#                                   base64 of a private debug keystore (alias androiddebugkey, passwords "android");
+#                                   without it debug APKs are signed with the public test key
+#                                   mobile/android/app/abj-debug.keystore
 name: ABJ Android app
 
 on:
@@ -93,8 +97,23 @@ jobs:
       - name: Sync the Capacitor project
         run: npx cap sync android
 
+      # Debug APKs keep one signing key from run to run, so a new one installs over the previous one.
+      - name: Decode the debug keystore
+        id: debug_keystore
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/abj-debug.keystore"
+            echo "file=$RUNNER_TEMP/abj-debug.keystore" >> "$GITHUB_OUTPUT"
+          else
+            echo "Secret ANDROID_DEBUG_KEYSTORE_BASE64 is not set: the debug APK is signed with the public test key android/app/abj-debug.keystore"
+          fi
+
       - name: Build the debug APK
         working-directory: mobile/android
+        env:
+          ABJ_DEBUG_KEYSTORE_FILE: ${{ steps.debug_keystore.outputs.file }}
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Decode the release keystore
@@ -109,7 +128,7 @@ jobs:
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/abj-release.jks"
             echo "file=$RUNNER_TEMP/abj-release.jks" >> "$GITHUB_OUTPUT"
           else
-            echo "Release signing secrets are not set: only the debug APK is built"
+            echo "::warning::Release signing secrets are not set: only a DEBUGGABLE test APK was built (artifact abj-debug-test-only-$GITHUB_RUN_NUMBER), do not distribute it"
           fi
 
       - name: Build the signed release APK
@@ -124,12 +143,12 @@ jobs:
 
       - name: Remove secrets from the workspace
         if: always()
-        run: rm -f android/app/google-services.json "$RUNNER_TEMP/abj-release.jks"
+        run: rm -f android/app/google-services.json "$RUNNER_TEMP/abj-release.jks" "$RUNNER_TEMP/abj-debug.keystore"
 
       - name: Upload the debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: abj-debug-${{ github.run_number }}
+          name: abj-debug-test-only-${{ github.run_number }}
           path: mobile/android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
