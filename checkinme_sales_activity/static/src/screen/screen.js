@@ -6,6 +6,7 @@ import { isDisplayStandalone, isIOS } from "@web/core/browser/feature_detection"
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { useSetupAction } from "@web/search/action_hook";
 import {
     loadPrinterSettings,
     PAPER_WIDTHS,
@@ -16,6 +17,8 @@ import { PrintError, removePrintArea } from "@checkinme_sales_activity/screen/pr
 import {
     enableWebPush,
     prefetchWebPush,
+    readPushEndpoint,
+    unregisterWebPush,
     webPushStatus,
     webPushSupported,
 } from "@checkinme_sales_activity/screen/push/web_push";
@@ -26,6 +29,15 @@ const PHOTO_MAX_SIDE = 1600;
 const PHOTO_QUALITY = 0.8;
 const PUSH_BANNER_KEY = "abj.push_banner_dismissed";
 const INSTALL_URL = "/scoped_app?app_id=checkinme_sales_activity&app_name=ABJ&path=odoo/abj";
+// back to the app (not the backend) after the next login
+const LOGOUT_URL = `/web/session/logout?redirect=${encodeURIComponent("/odoo/abj")}`;
+// business errors already explained to the user by the toast (not bugs)
+const EXPECTED_ERRORS = [
+    "odoo.exceptions.UserError",
+    "odoo.exceptions.AccessError",
+    "odoo.exceptions.MissingError",
+    "odoo.exceptions.ValidationError",
+];
 
 function formatDistance(meters) {
     if (meters === null || meters === undefined) {
@@ -127,7 +139,7 @@ export class CheckinmeScreen extends Component {
             loading: true,
             busy: false,
             dashboard: null,
-            geo: { status: "idle", latitude: 0, longitude: 0, accuracy: 0, error: "" },
+            geo: { status: "idle", latitude: 0, longitude: 0, accuracy: 0, error: "", denied: false },
             checkin: this.emptyCheckin(),
             checkout: { visit: null, outcome: "", sale_amount: "", notes: "", next_action_date: "" },
             result: null,
@@ -143,19 +155,30 @@ export class CheckinmeScreen extends Component {
             // notifications
             push: { status: webPushStatus(), busy: false, testing: false, bannerDismissed: readFlag(PUSH_BANNER_KEY) },
             appInfo: null,
+            loggingOut: false,
         });
         this.searchTimer = null;
         this.webPushPrefetch = null;
-        // deep links: backend "Open in phone screen" (context) and /odoo/abj/<id> (router resId)
-        this.pendingOpenId = this.props.action?.context?.checkinme_open_id || this.props.resId || null;
-        this.urlVisitId = this.props.resId || undefined;
+        // back from a form opened with "Edit in Odoo" (breadcrumb): reopen the visit that was on
+        // screen, not the one of the original deep link
+        useSetupAction({ getLocalState: () => ({ abjVisitId: this.urlVisitId || false }) });
+        const restored = this.props.state && "abjVisitId" in this.props.state;
+        if (restored) {
+            this.pendingOpenId = this.props.state.abjVisitId || null;
+            this.urlVisitId = this.props.state.abjVisitId || undefined;
+        } else {
+            // deep links: backend "Open in phone screen" (context) and /odoo/abj/<id> (router resId)
+            this.pendingOpenId = this.props.action?.context?.checkinme_open_id || this.props.resId || null;
+            this.urlVisitId = this.props.resId || undefined;
+        }
 
         onWillStart(async () => {
             this.prefetchWebPush();
             this.abjNative.info().then((info) => (this.state.appInfo = info));
             await this.loadDashboard();
             if (this.pendingOpenId) {
-                await this.openVisit(this.pendingOpenId);
+                // only the RPC delays the first render: the GPS fix arrives on the mounted screen
+                await this.openVisit(this.pendingOpenId, { waitGps: false });
             }
         });
         onWillDestroy(() => {
@@ -178,13 +201,13 @@ export class CheckinmeScreen extends Component {
             case "checkout":
                 return _t("Check out");
             case "result":
-                return _t("Done");
+                return this.state.resultKind === "view" ? _t("Visit") : _t("Done");
             case "history":
                 return _t("My visits");
             case "settings":
                 return _t("Settings");
             default:
-                return _t("Sale Check");
+                return this.app.name || _t("ABJ");
         }
     }
 
@@ -284,9 +307,15 @@ export class CheckinmeScreen extends Component {
             case "granted":
                 return { label: _t("On"), badge: "verified", hint: "" };
             case "denied":
-                return { label: _t("Blocked"), badge: "behind", hint: _t("Notifications are blocked for this site. Allow them in the browser settings (site settings > Notifications).") };
+                return {
+                    label: _t("Blocked"),
+                    badge: "behind",
+                    hint: this.isIOS && this.isStandalone
+                        ? _t("Notifications are blocked for ABJ. Allow them in the iPhone Settings > Notifications > ABJ.")
+                        : _t("Notifications are blocked for this site. Allow them in the browser settings (site settings > Notifications)."),
+                };
             case "ios-install-first":
-                return { label: _t("Install first"), badge: "at_risk", hint: _t("Install ABJ on your Home Screen first (Share > Add to Home Screen), iOS 16.4 or later, then open it from the Home Screen.") };
+                return { label: _t("Install first"), badge: "at_risk", hint: _t("Install ABJ on your Home Screen first: tap \"Install page\" below, then on that page tap Share > Add to Home Screen (iOS 16.4 or later), and open ABJ from the Home Screen.") };
             case "unsupported":
                 return { label: _t("Not supported"), badge: "none", hint: _t("This browser cannot receive notifications.") };
             default:
@@ -314,6 +343,19 @@ export class CheckinmeScreen extends Component {
 
     get showPushBanner() {
         return !this.isNative && this.state.push.status === "prompt" && !this.state.push.bannerDismissed && webPushSupported();
+    }
+
+    /** The test notification only makes sense where this phone can receive notifications. */
+    get canTestPush() {
+        if (this.isNative) {
+            return this.nativePush.available;
+        }
+        return !["ios-install-first", "unsupported"].includes(this.state.push.status);
+    }
+
+    /** Done visits whose follow-up date is today (older servers do not send them). */
+    get followups() {
+        return this.dashboard?.followups_today || [];
     }
 
     get transports() {
@@ -353,6 +395,11 @@ export class CheckinmeScreen extends Component {
         return (visit && visit.sale_orders) || [];
     }
 
+    /** False for a teammate's visit (manager opening a team notification): read-only. */
+    isMine(visit) {
+        return Boolean(visit) && visit.is_mine !== false;
+    }
+
     isPrinting(visitId, orderId = false) {
         return this.state.printing === `${visitId}-${orderId || 0}`;
     }
@@ -389,12 +436,13 @@ export class CheckinmeScreen extends Component {
         }
     }
 
-    handleError(error, title = _t("Sale Check")) {
+    handleError(error, title = _t("ABJ")) {
         const message =
             (error && error.data && error.data.message) || (error && error.message) || _t("Something went wrong.");
         this.notification.add(message, { type: "danger", title });
-        if (error instanceof PrintError) {
-            console.warn(error); // expected (printer off, out of range...): already explained to the user
+        if (error instanceof PrintError || EXPECTED_ERRORS.includes(error?.exceptionName)) {
+            // expected (printer off, deleted visit, no access...): already explained to the user
+            console.warn(error);
         } else {
             console.error(error);
         }
@@ -429,6 +477,7 @@ export class CheckinmeScreen extends Component {
         }
         geo.status = "locating";
         geo.error = "";
+        geo.denied = false;
         try {
             const position = await new Promise((resolve, reject) =>
                 browser.navigator.geolocation.getCurrentPosition(resolve, reject, GEO_OPTIONS)
@@ -440,12 +489,23 @@ export class CheckinmeScreen extends Component {
             return true;
         } catch (error) {
             geo.status = "error";
-            geo.error =
-                error && error.code === 1
-                    ? _t("Location access was denied. Allow location access for this site and try again.")
-                    : _t("Your position could not be captured. Move to an open area and try again.");
+            geo.denied = Boolean(error && error.code === 1);
+            geo.error = geo.denied
+                ? this.locationDeniedMessage()
+                : _t("Your position could not be captured. Move to an open area and try again.");
             return false;
         }
+    }
+
+    /** Where to allow a denied location permission: the Android app and an iPhone have no site settings. */
+    locationDeniedMessage() {
+        if (this.isNative) {
+            return _t("Location access was denied. Tap \"Open app settings\", allow Location for ABJ, then try again.");
+        }
+        if (this.isIOS) {
+            return _t("Location access was denied. Allow it in the iPhone Settings > Privacy & Security > Location Services, then try again.");
+        }
+        return _t("Location access was denied. Allow location for this site in the browser settings (site settings > Location), then try again.");
     }
 
     geoPayload() {
@@ -462,7 +522,12 @@ export class CheckinmeScreen extends Component {
     // ------------------------------------------------------------------
     // Check-in flow
     // ------------------------------------------------------------------
-    async startCheckin(planned = null) {
+    /**
+     * @param {object} [planned] mobile values of a planned visit (or prefilled values without id)
+     * @param {object} [options]
+     * @param {boolean} [options.waitGps=true] false: return without waiting for the GPS fix
+     */
+    async startCheckin(planned = null, { waitGps = true } = {}) {
         this.state.checkin = this.emptyCheckin();
         const types = this.dashboard?.types || [];
         const preferred = types.find((t) => t.counts_as_visit) || types[0];
@@ -487,10 +552,15 @@ export class CheckinmeScreen extends Component {
         this.state.customers = [];
         this.state.view = "checkin";
         this.state.checkin.step = "location";
-        const ok = await this.captureGps();
-        if (ok) {
-            this.continueFromLocation();
+        const located = this.captureGps().then((ok) => ok && this.continueFromLocation());
+        if (waitGps) {
+            await located;
         }
+    }
+
+    /** "Follow-ups today": a new check-in at the customer of an earlier visit. */
+    startFollowUp(visit) {
+        return this.startCheckin({ ...visit, id: false, purpose: "", notes: "" });
     }
 
     continueFromLocation() {
@@ -639,7 +709,12 @@ export class CheckinmeScreen extends Component {
     // ------------------------------------------------------------------
     // Check-out flow
     // ------------------------------------------------------------------
-    async startCheckout(visit) {
+    /**
+     * @param {object} visit mobile values of the open visit
+     * @param {object} [options]
+     * @param {boolean} [options.waitGps=true] false: return without waiting for the GPS fix
+     */
+    async startCheckout(visit, { waitGps = true } = {}) {
         this.state.checkout = {
             visit,
             outcome: visit.outcome || "",
@@ -649,7 +724,10 @@ export class CheckinmeScreen extends Component {
         };
         this.state.view = "checkout";
         this.setUrlVisit(visit.id);
-        await this.captureGps();
+        const located = this.captureGps();
+        if (waitGps) {
+            await located;
+        }
     }
 
     chooseOutcome(value) {
@@ -686,13 +764,21 @@ export class CheckinmeScreen extends Component {
         }
     }
 
-    async openVisit(id) {
+    /**
+     * Open a visit in the screen (deep link, notification, history, Home): check-out form for my
+     * open visit, check-in for my planned visit, otherwise the read-only visit card.
+     *
+     * @param {number} id
+     * @param {object} [options] passed to startCheckout / startCheckin
+     */
+    async openVisit(id, options = {}) {
         try {
             const visit = await this.orm.call("checkinme.checkin", "mobile_get_checkin", [id]);
-            if (visit.state === "checked_in") {
-                await this.startCheckout(visit);
-            } else if (visit.state === "draft") {
-                await this.startCheckin(visit);
+            const mine = this.isMine(visit);
+            if (mine && visit.state === "checked_in") {
+                await this.startCheckout(visit, options);
+            } else if (mine && visit.state === "draft") {
+                await this.startCheckin(visit, options);
             } else {
                 this.state.result = visit;
                 this.state.resultKind = "view";
@@ -700,6 +786,10 @@ export class CheckinmeScreen extends Component {
                 this.setUrlVisit(visit.id);
             }
         } catch (error) {
+            if (this.urlVisitId && this.urlVisitId === id) {
+                // bad deep link: do not keep it in the URL (each reload would fail again)
+                this.setUrlVisit(false);
+            }
             this.handleError(error);
         }
     }
@@ -816,19 +906,51 @@ export class CheckinmeScreen extends Component {
     }
 
     async sendTestPush() {
+        // the server reports whether *this* phone was reached (not another device of the user)
+        const target = this.isNative ? { token: this.abjNative.pushToken() } : { endpoint: readPushEndpoint() };
+        if (!target.token && !target.endpoint) {
+            this.notification.add(_t("This phone is not registered for notifications yet. Turn notifications on first."), {
+                type: "warning",
+                title: _t("Notifications"),
+            });
+            return;
+        }
         this.state.push.testing = true;
         try {
-            const result = (await this.orm.call("checkinme.checkin", "mobile_send_test_push", [])) || {};
+            const result = (await this.orm.call("checkinme.checkin", "mobile_send_test_push", [], target)) || {};
             const sent = (Number(result.web) || 0) + (Number(result.native) || 0);
+            // this_device is null/absent when the server cannot tell: fall back to the device count
+            const reached = result.this_device ?? sent > 0;
             this.notification.add(
-                result.message || (sent ? _t("Test notification sent.") : _t("No device of yours is registered for notifications yet.")),
-                { type: sent ? "success" : "warning", title: _t("Notifications") }
+                result.message || (reached ? _t("Test notification sent.") : _t("This phone is not registered for notifications yet.")),
+                { type: reached ? "success" : "warning", title: _t("Notifications") }
             );
         } catch (error) {
             this.handleError(error, _t("Notifications"));
         } finally {
             this.state.push.testing = false;
         }
+    }
+
+    /**
+     * Settings > Log out: stop the notifications of this phone first (FCM token in the Android
+     * app, web push endpoint in a browser), else the next user of a shared phone would get them.
+     */
+    async logOut() {
+        if (this.state.loggingOut) {
+            return;
+        }
+        this.state.loggingOut = true;
+        try {
+            if (this.isNative) {
+                await this.abjNative.unregisterPush();
+            } else {
+                await unregisterWebPush(this.orm);
+            }
+        } catch (error) {
+            console.warn("ABJ: notifications of this phone not unregistered", error);
+        }
+        browser.location.assign(LOGOUT_URL);
     }
 
     // ------------------------------------------------------------------

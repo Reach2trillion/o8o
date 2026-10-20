@@ -69,7 +69,7 @@
             </div>
             <div class="o_checkinme_row mt-3">
                 <button type="button" class="btn btn-primary o_checkinme_btn_lg flex-grow-1" t-on-click="() => this.startCheckout(d.open_visit)"><i class="fa fa-flag-checkered me-2"/>Check Out</button>
-                <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="() => this.openRecord(d.open_visit.id)" aria-label="Details"><i class="fa fa-pencil"/></button>
+                <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="() => this.openRecord(d.open_visit.id)" aria-label="Edit in Odoo" title="Edit in Odoo"><i class="fa fa-pencil"/></button>
             </div>
         </section>
 
@@ -113,21 +113,34 @@
             </div>
         </section>
 
+        <section t-if="followups.length" class="o_checkinme_card o_abj_followups">
+            <div class="o_checkinme_card_title"><i class="fa fa-calendar-check-o me-2"/>Follow-ups today</div>
+            <div t-foreach="followups" t-as="visit" t-key="visit.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.openVisit(visit.id)">
+                <div class="o_checkinme_list_main">
+                    <div class="o_checkinme_list_title" t-esc="visit.partner_name or visit.type_name"/>
+                    <div class="o_checkinme_muted">Last visit <t t-esc="visit.checkin_date_local"/><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm o_checkinme_btn_md" t-att-disabled="!d.employee.has_employee"
+                        t-on-click.stop="() => this.startFollowUp(visit)">Check In</button>
+            </div>
+        </section>
+
         <section class="o_checkinme_card">
             <div class="o_checkinme_card_title"><i class="fa fa-check-square-o me-2"/>Today's visits</div>
             <div t-if="!d.today_visits.length" class="o_checkinme_muted">No visit yet today.</div>
-            <div t-foreach="d.today_visits" t-as="visit" t-key="visit.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.openRecord(visit.id)">
+            <div t-foreach="d.today_visits" t-as="visit" t-key="visit.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.openVisit(visit.id)">
                 <div class="o_checkinme_list_time" t-esc="visit.checkin_time_local"/>
                 <div class="o_checkinme_list_main">
                     <div class="o_checkinme_list_title" t-esc="visit.partner_name or visit.type_name"/>
                     <div class="o_checkinme_muted"><t t-esc="visit.type_name"/><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
+                    <span t-attf-class="o_checkinme_badge o_abj_row_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
                 </div>
-                <span t-attf-class="o_checkinme_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
+                <i class="fa fa-chevron-right o_checkinme_muted"/>
             </div>
         </section>
 
         <div class="o_checkinme_footer">
-            <a href="#" t-on-click.prevent="openFullApp">Open the full application</a>
+            <a href="#" t-on-click.prevent="openFullApp">Open Sale Check in Odoo</a>
         </div>
     </t>
 
@@ -159,6 +172,9 @@
                     <div class="o_checkinme_visit_name">No GPS position</div>
                     <div class="o_checkinme_muted" t-esc="state.geo.error"/>
                 </t>
+                <button t-if="isNative and state.geo.denied" type="button" class="btn btn-outline-primary o_checkinme_btn_md w-100 mt-3" t-on-click="openAppSettings">
+                    <i class="fa fa-cog me-2"/>Open app settings
+                </button>
                 <div class="o_checkinme_row mt-3">
                     <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="captureGps" t-att-disabled="state.geo.status === 'locating'"><i class="fa fa-refresh me-2"/>Retry</button>
                     <button type="button" class="btn btn-primary o_checkinme_btn_lg flex-grow-1" t-on-click="continueFromLocation" t-att-disabled="state.geo.status === 'locating' or (requireGps and !hasPosition)">Continue<i class="fa fa-arrow-right ms-2"/></button>
@@ -211,7 +227,7 @@
                 <div class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.goToStep('customer')">
                     <div class="o_checkinme_list_main">
                         <div class="o_checkinme_muted">Customer</div>
-                        <div class="o_checkinme_list_title" t-esc="c.partner ? c.partner.name : 'No customer'"/>
+                        <div class="o_checkinme_list_title"><t t-if="c.partner" t-esc="c.partner.name"/><t t-else="">No customer</t></div>
                         <div class="o_checkinme_muted" t-if="c.partner and c.partner.address" t-esc="c.partner.address"/>
                     </div>
                     <span t-if="c.partner and c.partner.distance_m !== null and c.partner.distance_m !== undefined" class="o_checkinme_badge o_checkinme_badge_distance" t-esc="formatDistance(c.partner.distance_m)"/>
@@ -236,7 +252,7 @@
                 <label class="o_checkinme_label">Photo</label>
                 <div t-if="c.photoPreview" class="o_checkinme_photo">
                     <img t-att-src="c.photoPreview" alt="Photo"/>
-                    <button type="button" class="btn btn-sm btn-light" t-on-click="removePhoto"><i class="fa fa-trash"/></button>
+                    <button type="button" class="btn btn-sm btn-light" t-on-click="removePhoto" aria-label="Remove photo" title="Remove photo"><i class="fa fa-trash"/></button>
                 </div>
                 <label t-else="" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mb-0">
                     <i class="fa fa-camera me-2"/>Take a photo
@@ -262,6 +278,10 @@
                 <t t-elif="state.geo.status === 'ok'"><i class="fa fa-map-marker me-1 text-success"/>Check-out position captured (&#177;<t t-esc="state.geo.accuracy"/> m)</t>
                 <t t-else=""><i class="fa fa-exclamation-circle me-1 text-warning"/>No check-out position. <a href="#" t-on-click.prevent="captureGps">Retry</a></t>
             </div>
+            <t t-if="state.geo.status === 'error' and state.geo.denied">
+                <div class="o_checkinme_muted mt-1" t-esc="state.geo.error"/>
+                <a t-if="isNative" href="#" class="d-block mt-1 o_abj_link_small" t-on-click.prevent="openAppSettings"><i class="fa fa-cog me-1"/>Open app settings</a>
+            </t>
         </section>
 
         <div class="o_checkinme_section_label">Outcome</div>
@@ -300,6 +320,7 @@
                 <t t-else="" t-esc="r.state_label"/>
             </div>
             <div class="o_checkinme_muted" t-esc="r.name"/>
+            <div t-if="!isMine(r) and r.employee_name" class="o_checkinme_muted"><i class="fa fa-user me-1"/><t t-esc="r.employee_name"/></div>
             <div class="mt-3 o_checkinme_list_title" t-esc="r.partner_name or r.type_name"/>
             <div class="o_checkinme_muted"><t t-esc="r.type_name"/> &#183; <t t-esc="r.checkin_date_local"/> <t t-esc="r.checkin_time_local"/><t t-if="r.checkout_time_local"> &#8594; <t t-esc="r.checkout_time_local"/></t></div>
             <div class="mt-3">
@@ -329,9 +350,11 @@
             <a href="#" t-on-click.prevent="openSettings"><i class="fa fa-print me-1"/>Set up printer</a>
         </div>
         <div class="o_checkinme_row">
-            <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="() => this.openRecord(r.id)"><i class="fa fa-pencil me-2"/>Edit</button>
-            <button t-if="r.state === 'checked_in'" type="button" class="btn btn-outline-primary o_checkinme_btn_lg" t-on-click="() => this.startCheckout(r)"><i class="fa fa-flag-checkered me-2"/>Check Out</button>
+            <button t-if="r.state === 'checked_in' and isMine(r)" type="button" class="btn btn-outline-primary o_checkinme_btn_lg flex-grow-1" t-on-click="() => this.startCheckout(r)"><i class="fa fa-flag-checkered me-2"/>Check Out</button>
             <button type="button" class="btn btn-primary o_checkinme_btn_lg flex-grow-1" t-on-click="goHome"><i class="fa fa-home me-2"/>Done</button>
+        </div>
+        <div class="o_checkinme_footer mt-2">
+            <a href="#" t-on-click.prevent="() => this.openRecord(r.id)"><i class="fa fa-pencil me-1"/>Edit in Odoo</a>
         </div>
     </t>
 
@@ -347,9 +370,10 @@
                 <div class="o_checkinme_list_time"><div t-esc="visit.checkin_date_local"/><div class="o_checkinme_muted" t-esc="visit.checkin_time_local"/></div>
                 <div class="o_checkinme_list_main">
                     <div class="o_checkinme_list_title" t-esc="visit.partner_name or visit.type_name"/>
-                    <div class="o_checkinme_muted"><t t-esc="visit.type_name"/> &#183; <t t-esc="visit.state_label"/><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
+                    <div class="o_checkinme_muted"><t t-esc="visit.type_name"/><t t-if="visit.state !== 'draft'"> &#183; <t t-esc="visit.state_label"/></t><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
+                    <span t-if="visit.state === 'draft'" class="o_checkinme_badge o_abj_row_badge o_checkinme_badge_upcoming" t-esc="visit.state_label"/>
+                    <span t-else="" t-attf-class="o_checkinme_badge o_abj_row_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
                 </div>
-                <span t-attf-class="o_checkinme_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
                 <button t-if="printerReady and visit.state !== 'draft'" type="button" class="btn btn-outline-secondary o_abj_icon_btn"
                         t-on-click.stop="() => this.printSlip(visit)" t-att-disabled="state.printing" aria-label="Print slip" title="Print slip">
                     <i t-if="isPrinting(visit.id)" class="fa fa-spinner fa-spin"/><i t-else="" class="fa fa-print"/>
@@ -369,6 +393,9 @@
             </div>
             <div class="o_checkinme_muted mb-3">Planned visits, follow-up reminders and Odoo messages on this phone.</div>
             <div t-if="ns.hint" class="o_abj_hint mb-3" t-esc="ns.hint"/>
+            <a t-if="!isNative and state.push.status === 'ios-install-first'" t-att-href="installUrl" class="btn btn-primary o_checkinme_btn_lg w-100 mb-2">
+                <i class="fa fa-download me-2"/>Install page
+            </a>
             <div t-if="!serverPushReady" class="o_abj_hint o_abj_hint_warning mb-3">
                 <i class="fa fa-exclamation-triangle me-1"/>The server cannot send notifications to this kind of device yet. Ask your administrator.
             </div>
@@ -388,7 +415,7 @@
                 </button>
                 <a t-else="" href="#" class="d-block mb-2 o_abj_link_small" t-on-click.prevent="enableNotifications">Register this device again</a>
             </t>
-            <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100" t-on-click="sendTestPush" t-att-disabled="state.push.testing">
+            <button t-if="canTestPush" type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100" t-on-click="sendTestPush" t-att-disabled="state.push.testing">
                 <i t-if="state.push.testing" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-paper-plane me-2"/>Send test notification
             </button>
         </section>
@@ -412,15 +439,16 @@
                     <div class="o_checkinme_section_label mt-3">Paired printers</div>
                     <div t-if="state.printerUi.loadingDevices" class="o_checkinme_muted"><i class="fa fa-spinner fa-spin me-1"/>Looking for paired devices...</div>
                     <div t-elif="!state.printerUi.devices.length" class="o_checkinme_muted">No paired printer found. Pair the printer in the phone's Bluetooth settings first.</div>
-                    <div t-foreach="state.printerUi.devices" t-as="device" t-key="device.id"
-                         t-attf-class="o_checkinme_list_item o_checkinme_clickable {{ device.id === state.printer.deviceId ? 'o_abj_selected' : '' }}" t-on-click="() => this.pickPrinterDevice(device)">
+                    <button t-foreach="state.printerUi.devices" t-as="device" t-key="device.id" type="button"
+                            t-attf-class="o_checkinme_list_item o_checkinme_clickable o_abj_device {{ device.id === state.printer.deviceId ? 'o_abj_selected' : '' }}"
+                            t-att-aria-pressed="device.id === state.printer.deviceId ? 'true' : 'false'" t-on-click="() => this.pickPrinterDevice(device)">
                         <i t-attf-class="fa {{ device.likelyPrinter ? 'fa-print' : 'fa-bluetooth-b' }} o_checkinme_muted"/>
-                        <div class="o_checkinme_list_main">
-                            <div class="o_checkinme_list_title" t-esc="device.name"/>
-                            <div class="o_checkinme_muted" t-esc="device.id"/>
-                        </div>
+                        <span class="o_checkinme_list_main">
+                            <span class="o_checkinme_list_title d-block" t-esc="device.name"/>
+                            <span class="o_checkinme_muted d-block" t-esc="device.id"/>
+                        </span>
                         <i t-if="device.id === state.printer.deviceId" class="fa fa-check-circle text-success"/>
-                    </div>
+                    </button>
                     <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mt-2" t-on-click="loadPrinterDevices" t-att-disabled="state.printerUi.loadingDevices">
                         <i class="fa fa-refresh me-2"/>Refresh the list
                     </button>
@@ -450,6 +478,7 @@
                 <div class="o_abj_segmented">
                     <button t-foreach="paperWidths" t-as="paper" t-key="paper.dots" type="button"
                             t-attf-class="btn {{ paper.dots === state.printer.widthDots ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-att-aria-pressed="paper.dots === state.printer.widthDots ? 'true' : 'false'"
                             t-on-click="() => this.setPrinterOption('widthDots', paper.dots)"><t t-esc="paper.mm"/> mm</button>
                 </div>
 
@@ -486,12 +515,15 @@
             <div t-if="app.company and app.company.name" class="o_abj_kv"><span class="o_checkinme_muted">Company</span><span t-esc="app.company.name"/></div>
             <div t-if="!isNative and !isStandalone" class="o_abj_hint mt-3">
                 <div class="o_checkinme_list_title mb-1"><i class="fa fa-download me-1"/>Install ABJ on this phone</div>
-                <div t-if="isIOS" class="o_checkinme_muted">Open this page in Safari, then tap Share &gt; Add to Home Screen. Notifications need iOS 16.4 or later.</div>
-                <div t-else="" class="o_checkinme_muted">Open the install page and tap "Install", or use the browser menu &gt; Add to Home screen.</div>
+                <div t-if="isIOS" class="o_checkinme_muted">In Safari, tap "Install page" below, then on that page tap Share &gt; Add to Home Screen. Notifications need iOS 16.4 or later.</div>
+                <div t-else="" class="o_checkinme_muted">Tap "Install page" below, then "Install" on that page (or the browser menu &gt; Install app on that page).</div>
                 <a t-att-href="installUrl" class="btn btn-outline-primary o_checkinme_btn_md w-100 mt-2"><i class="fa fa-download me-2"/>Install page</a>
             </div>
             <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mt-3" t-on-click="openFullOdoo">
                 <i class="fa fa-th me-2"/>Open full Odoo
+            </button>
+            <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mt-2 o_abj_logout" t-on-click="logOut" t-att-disabled="state.loggingOut">
+                <i t-if="state.loggingOut" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-sign-out me-2"/>Log out
             </button>
         </section>
     </t>

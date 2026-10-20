@@ -385,7 +385,15 @@ export function removePrintArea() {
     document.body.classList.remove(PRINTING_BODY_CLASS);
 }
 
-async function showPrintArea(canvas, doc) {
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {object} doc
+ * @param {object} [options]
+ * @param {boolean} [options.clearAfterPrint=true] false: keep the print class until the next
+ *      print or removePrintArea() (Android's PrintManager renders the page after printPage()
+ *      returned, and again for each preview change, each render firing afterprint)
+ */
+async function showPrintArea(canvas, doc, { clearAfterPrint = true } = {}) {
     let area = document.querySelector(`.${PRINT_AREA_CLASS}`);
     if (!area) {
         area = document.createElement("div");
@@ -403,8 +411,11 @@ async function showPrintArea(canvas, doc) {
         // decode() unsupported: the data URL is synchronous enough for printing
     }
     // print stylesheet (screen.scss): while the class is set, only the receipt is printed
+    // (it has no effect on screen, so keeping it set is harmless)
     document.body.classList.add(PRINTING_BODY_CLASS);
-    browser.addEventListener("afterprint", () => document.body.classList.remove(PRINTING_BODY_CLASS), { once: true });
+    if (clearAfterPrint) {
+        browser.addEventListener("afterprint", () => document.body.classList.remove(PRINTING_BODY_CLASS), { once: true });
+    }
 }
 
 /** Last resort when the browser cannot print (window.print missing / failing): open the image. */
@@ -439,8 +450,8 @@ export class SystemPrintTransport extends Transport {
         return true;
     }
     async print(bytes, settings, { canvas, doc } = {}) {
-        await showPrintArea(canvas, doc);
         const plugin = this.nativePlugin;
+        await showPrintArea(canvas, doc, { clearAfterPrint: !plugin });
         if (plugin) {
             // Android app: the WebView has no window.print(), use Android's PrintManager
             await callNative(() => plugin.printPage({ jobName: doc?.name || "ABJ" }));

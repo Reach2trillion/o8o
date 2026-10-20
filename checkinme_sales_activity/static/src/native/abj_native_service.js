@@ -10,13 +10,21 @@ import { registry } from "@web/core/registry";
  *
  * In the app, ``window.Capacitor`` exposes the native plugins: ``AbjNative`` (printers, app info)
  * and ``PushNotifications`` (FCM). On start the service registers the phone's FCM token on the
- * server (``checkinme.push.device``) and opens the URL of a tapped notification.
+ * server (``checkinme.push.device``) and opens the URL of a tapped notification; on logout (user
+ * menu, ABJ settings) it unregisters the token first.
  * In a normal browser every helper is a no-op (isNative() is false, info() resolves to null).
  */
 
 const NATIVE_PLUGIN = "AbjNative";
 const PUSH_PLUGIN = "PushNotifications";
-const PUSH_CHANNEL = { id: "abj_default", name: "ABJ", importance: 4 };
+// same name and description as MainActivity's channel (createChannel overwrites them)
+const PUSH_CHANNEL = {
+    id: "abj_default",
+    name: "ABJ",
+    description: "Planned visits, follow-up reminders and Odoo messages",
+    importance: 4,
+};
+const UNREGISTER_TIMEOUT_MS = 5000;
 
 function capacitor() {
     return window.Capacitor || null;
@@ -47,6 +55,8 @@ export const abjNativeService = {
             error: "",
         });
         let infoPromise = null;
+        // FCM token of this phone (from the "registration" listener)
+        let pushToken = null;
 
         const service = {
             pushStatus,
@@ -111,6 +121,45 @@ export const abjNativeService = {
                     console.warn("ABJ app: cannot open the app settings", error);
                 }
             },
+
+            /** FCM token of this phone, or null (no Firebase, permission denied, not received yet). */
+            pushToken() {
+                return pushToken;
+            },
+
+            /**
+             * Before logging out: stop the notifications of this phone (server device and FCM
+             * token), so the next user of a shared phone does not get them. Never throws and
+             * never takes more than UNREGISTER_TIMEOUT_MS.
+             */
+            async unregisterPush() {
+                const push = service.plugin(PUSH_PLUGIN);
+                const token = pushToken;
+                const steps = [];
+                if (token) {
+                    steps.push(orm.call("checkinme.push.device", "unregister_device", [token]));
+                }
+                if (pushStatus.available && push) {
+                    // deletes the FCM token: the next login gets a new one (never without Firebase)
+                    steps.push(Promise.resolve().then(() => push.unregister()));
+                }
+                let timer;
+                const timeout = new Promise((resolve) => {
+                    timer = browser.setTimeout(() => resolve([{ status: "rejected", reason: "timeout" }]), UNREGISTER_TIMEOUT_MS);
+                });
+                try {
+                    const results = await Promise.race([Promise.allSettled(steps), timeout]);
+                    for (const result of results) {
+                        if (result.status === "rejected") {
+                            console.warn("ABJ app: push not unregistered", result.reason);
+                        }
+                    }
+                } finally {
+                    browser.clearTimeout(timer);
+                }
+                pushToken = null;
+                pushStatus.registered = false;
+            },
         };
 
         function openUrl(url) {
@@ -149,6 +198,7 @@ export const abjNativeService = {
                 console.warn("ABJ app: notification channel not created", error);
             }
             await push.addListener("registration", async ({ value }) => {
+                pushToken = value || null;
                 try {
                     await orm.call("checkinme.push.device", "register_device", [value], {
                         platform: "android",
@@ -171,11 +221,17 @@ export const abjNativeService = {
             await push.addListener("pushNotificationActionPerformed", (action) => {
                 openUrl(action?.notification?.data?.abj_url);
             });
-            // Android does not show notifications while the app is in the foreground: show a toast
+            // In the foreground the plugin already shows a system notification for messages with a
+            // title / body (presentationOptions "alert"), whose tap fires the listener above. Only a
+            // data-only message would go unnoticed: show it as a toast.
             await push.addListener("pushNotificationReceived", (message) => {
-                const url = message?.data?.abj_url;
-                notification.add(message?.body || "", {
-                    title: message?.title || "ABJ",
+                if (message?.title || message?.body) {
+                    return;
+                }
+                const data = message?.data || {};
+                const url = data.abj_url;
+                notification.add(data.body || "", {
+                    title: data.title || "ABJ",
                     type: "info",
                     buttons: isSafeUrl(url) ? [{ name: _t("Open"), primary: true, onClick: () => openUrl(url) }] : [],
                 });
@@ -183,7 +239,31 @@ export const abjNativeService = {
             await registerPush({ prompt: true });
         }
 
+        /** User menu > Log out (full Odoo in the app): unregister this phone first. */
+        function patchLogOutItem() {
+            const items = registry.category("user_menuitems");
+            const logOutItem = items.get("log_out", null);
+            if (!logOutItem) {
+                return;
+            }
+            items.add(
+                "log_out",
+                (env) => {
+                    const item = logOutItem(env);
+                    return {
+                        ...item,
+                        callback: async () => {
+                            await service.unregisterPush();
+                            item.callback();
+                        },
+                    };
+                },
+                { force: true }
+            );
+        }
+
         if (service.isNative()) {
+            patchLogOutItem();
             setupPush().catch((error) => {
                 pushStatus.error = error?.message || String(error);
                 console.warn("ABJ app: push setup failed", error);
