@@ -444,7 +444,7 @@ class CheckinmeCheckin(models.Model):
     def action_send_telegram(self):
         """Manually (re)send the Telegram notification for these check-ins."""
         if not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager'):
-            raise AccessError(_("Only Check In managers can send Telegram notifications manually."))
+            raise AccessError(_("Only Sale Check managers can send Telegram notifications manually."))
         sent = 0
         for rec in self:
             event = 'checkout' if rec.state == 'done' else 'checkin'
@@ -528,7 +528,7 @@ class CheckinmeCheckin(models.Model):
         try:
             ok = self.env['checkinme.telegram']._notify_checkin_event(self, event)
         except Exception:  # noqa: BLE001 - never block the salesperson because of Telegram
-            _logger.exception("Check In: Telegram notification failed for %s", self.name)
+            _logger.exception("Sale Check: Telegram notification failed for %s", self.name)
             ok = False
         vals = {'telegram_notified': bool(ok)}
         if self.telegram_pending_event == event:

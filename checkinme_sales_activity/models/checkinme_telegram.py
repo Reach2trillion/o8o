@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Telegram Bot API integration for Check In (instant notifications and periodic reports)."""
+"""Telegram Bot API integration for Sale Check (instant notifications and periodic reports)."""
 import html
 import logging
 import re
@@ -75,7 +75,7 @@ class CheckinmeTelegramLog(models.Model):
 
 class CheckinmeTelegram(models.AbstractModel):
     _name = 'checkinme.telegram'
-    _description = 'Check In Telegram Service'
+    _description = 'Sale Check Telegram Service'
 
     # ------------------------------------------------------------------
     # Configuration helpers
@@ -163,7 +163,7 @@ class CheckinmeTelegram(models.AbstractModel):
             return bool(data.get('ok')), data
         except requests.RequestException as exc:
             message = "%s: %s" % (type(exc).__name__, self._sanitize(exc))
-            _logger.warning("Check In Telegram: %s failed: %s", method, message)
+            _logger.warning("Sale Check Telegram: %s failed: %s", method, message)
             return False, {'ok': False, 'description': message, 'transport_error': True}
 
     @api.model
@@ -184,7 +184,7 @@ class CheckinmeTelegram(models.AbstractModel):
                 'company_id': (checkin.company_id.id if checkin else self.env.company.id),
             })
         except Exception:  # noqa: BLE001 - logging must never break the business flow
-            _logger.exception("Check In Telegram: could not write log entry")
+            _logger.exception("Sale Check Telegram: could not write log entry")
 
     @api.model
     def _split_message(self, text, limit=TELEGRAM_MAX_MESSAGE_LENGTH):
@@ -452,7 +452,7 @@ class CheckinmeTelegram(models.AbstractModel):
         if not self.env['checkinme.config']._get_bool(flag_key, True):
             return False
         if not self._get_bot_token() or not self._get_default_chat_id():
-            _logger.info("Check In: %s report skipped, Telegram is not configured.", message_type)
+            _logger.info("Sale Check: %s report skipped, Telegram is not configured.", message_type)
             return False
         results = []
         for company in self.env['res.company'].search([]):
@@ -504,7 +504,7 @@ class CheckinmeTelegram(models.AbstractModel):
         """Check the bot token (getMe) and send a test message to the managers' chat."""
         if not (self.env.user.has_group('base.group_system')
                 or self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager')):
-            raise AccessError(_("Only Check In managers can test the Telegram connection."))
+            raise AccessError(_("Only Sale Check managers can test the Telegram connection."))
         token = self._get_bot_token()
         if not token:
             raise UserError(_("Please configure the Telegram bot token first."))
@@ -516,7 +516,7 @@ class CheckinmeTelegram(models.AbstractModel):
         if not chat_id:
             raise UserError(_("Bot @%s is valid. Please configure the managers' chat id to send messages.", bot_name))
         text = "✅ <b>%s</b>\n%s" % (
-            self._escape(_('Check In Sales Activity')),
+            self._escape(_('Sale Check')),
             self._escape(_('Telegram integration is working. Bot: @%s, company: %s.',
                            bot_name, self.env.company.name)))
         ok, response = self._send_message(chat_id, text, message_type='test')

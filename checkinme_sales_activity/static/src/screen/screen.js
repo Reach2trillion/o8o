@@ -35,7 +35,7 @@ function parseServerDatetime(value) {
 }
 
 /**
- * Check In phone screen: a single-page flow for field salespeople.
+ * Sale Check phone screen: a single-page flow for field salespeople.
  * Home (today, open visit, targets) -> Check in (GPS -> customer -> details) -> Check out -> Result.
  * Every step calls a regular ORM method, so access rights, GPS verification and Telegram
  * notifications are handled by the server exactly as in the backend views.
@@ -93,7 +93,7 @@ export class CheckinmeScreen extends Component {
             case "history":
                 return _t("My visits");
             default:
-                return _t("Check In");
+                return _t("Sale Check");
         }
     }
 
@@ -191,7 +191,7 @@ export class CheckinmeScreen extends Component {
     handleError(error) {
         const message =
             (error && error.data && error.data.message) || (error && error.message) || _t("Something went wrong.");
-        this.notification.add(message, { type: "danger", title: _t("Check In") });
+        this.notification.add(message, { type: "danger", title: _t("Sale Check") });
         console.error(error);
     }
 

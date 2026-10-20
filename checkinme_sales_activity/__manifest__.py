@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'Check In Sales Activity',
+    'name': 'Sale Check',
     'summary': 'GPS check-ins, customer visits, monthly KPI targets and Telegram reports for outside sales teams',
     'description': """
-Check In Sales Activity System
+Sale Check Sales Activity System
 ===============================
 Mobile-friendly sales activity management and tracking for outside sales teams.
 

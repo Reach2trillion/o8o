@@ -3,7 +3,7 @@
 
     <!-- Root -->
     <menuitem id="menu_checkinme_root"
-              name="Check In"
+              name="Sale Check"
               sequence="25"
               web_icon="checkinme_sales_activity,static/description/icon.png"
               groups="checkinme_sales_activity.group_checkinme_user"/>

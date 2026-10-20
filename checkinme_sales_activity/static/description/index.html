@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Check In Sales Activity</title>
+<title>Sale Check</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1f2937; background: #ffffff; line-height: 1.55;">
 
 <!-- ================= Hero ================= -->
 <section style="background: linear-gradient(120deg, #0a544e 0%, #0f766e 55%, #14968c 100%); color: #ffffff; padding: 56px 24px;">
     <div style="max-width: 1000px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 32px;">
-        <img src="icon.png" alt="Check In icon" style="width: 128px; height: 128px; border-radius: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);"/>
+        <img src="icon.png" alt="Sale Check icon" style="width: 128px; height: 128px; border-radius: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);"/>
         <div style="flex: 1; min-width: 260px;">
-            <h1 style="margin: 0 0 8px 0; font-size: 40px; font-weight: 800; letter-spacing: -0.5px;">Check In Sales Activity</h1>
+            <h1 style="margin: 0 0 8px 0; font-size: 40px; font-weight: 800; letter-spacing: -0.5px;">Sale Check</h1>
             <p style="margin: 0 0 16px 0; font-size: 20px; opacity: 0.95;">
                 GPS check-ins, customer visits, monthly KPI targets and Telegram reports for outside sales teams.
             </p>
@@ -28,7 +28,7 @@
     <div style="max-width: 1000px; margin: 0 auto;">
         <h2 style="font-size: 28px; margin: 0 0 12px 0; color: #0f766e;">Built for sales teams on the road</h2>
         <p style="font-size: 17px; margin: 0;">
-            Check In turns Odoo into a mobile sales activity system. Salespeople check in at the customer from their
+            Sale Check turns Odoo into a mobile sales activity system. Salespeople check in at the customer from their
             phone, the position is captured by GPS and linked to Google Maps, managers are notified instantly on Telegram,
             and every visit feeds real-time KPI dashboards and daily, weekly, monthly and yearly performance reports.
         </p>
@@ -109,8 +109,8 @@
     <div style="max-width: 1000px; margin: 0 auto;">
         <h2 style="font-size: 28px; margin: 0 0 8px 0; color: #0f766e;">Configuration</h2>
         <p style="margin: 0 0 20px 0; font-size: 16px;">
-            Install the app, then give your users the <strong>Check In / Salesperson</strong> or
-            <strong>Check In / Manager</strong> access right (Settings &gt; Users). Each salesperson needs an
+            Install the app, then give your users the <strong>Sale Check / Salesperson</strong> or
+            <strong>Sale Check / Manager</strong> access right (Settings &gt; Users). Each salesperson needs an
             employee record linked to their user; set the employee's <em>Manager</em> so that notifications reach
             the right person.
         </p>
@@ -133,13 +133,13 @@
                 Group ids are negative numbers. For a personal chat id, message <code style="background: #ccfbf1; padding: 1px 6px; border-radius: 4px;">@userinfobot</code>.
             </li>
             <li style="margin-bottom: 10px;">
-                <strong>Enter them in Odoo:</strong> go to <strong>Settings &gt; Check In</strong> (or Check In &gt; Configuration &gt; Settings),
+                <strong>Enter them in Odoo:</strong> go to <strong>Settings &gt; Sale Check</strong> (or Sale Check &gt; Configuration &gt; Settings),
                 paste the bot token and the managers' chat id, choose which notifications and periodic reports to send
                 (check-in, check-out, location pin, photo, daily / weekly / monthly reports) and save.
             </li>
             <li style="margin-bottom: 10px;">
                 <strong>Test the connection:</strong> click <strong>Test Connection</strong> in the settings. A test message is posted in the
-                group. Every message sent (or skipped) is listed under Check In &gt; Reporting &gt; Telegram Logs.
+                group. Every message sent (or skipped) is listed under Sale Check &gt; Reporting &gt; Telegram Logs.
             </li>
             <li>
                 Optionally, add a personal <strong>Telegram Chat ID</strong> on each manager's employee form so that they also receive the
@@ -152,7 +152,7 @@
             <li style="margin-bottom: 8px;"><strong>Require GPS Position to Check In</strong>: refuse check-ins without a captured position (on by default).</li>
             <li style="margin-bottom: 8px;"><strong>Maximum Distance (m)</strong>: a visit is "Verified On Site" when the position is within this distance of the customer's geolocation (default 500 m). Geolocate customers from their contact form (<em>Partner Assignment</em> tab &gt; <em>Compute based on address</em>) or enter the coordinates manually.</li>
             <li style="margin-bottom: 8px;"><strong>Sales Results Source</strong>: measure sales against targets using confirmed sales orders of the salesperson, or the sales amount entered on check-ins.</li>
-            <li><strong>Activity Types</strong> (Check In &gt; Configuration): customer visit, meeting, product demo, prospecting, delivery, payment collection, phone call... Decide which ones count as field visits and which ones require a customer.</li>
+            <li><strong>Activity Types</strong> (Sale Check &gt; Configuration): customer visit, meeting, product demo, prospecting, delivery, payment collection, phone call... Decide which ones count as field visits and which ones require a customer.</li>
         </ul>
     </div>
 </section>
@@ -160,12 +160,12 @@
 <!-- ================= Usage on mobile ================= -->
 <section style="padding: 40px 24px;">
     <div style="max-width: 1000px; margin: 0 auto;">
-        <h2 style="font-size: 28px; margin: 0 0 16px 0; color: #0f766e;">Using Check In on a phone</h2>
+        <h2 style="font-size: 28px; margin: 0 0 16px 0; color: #0f766e;">Using Sale Check on a phone</h2>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
             <div style="border-left: 4px solid #0f766e; padding: 4px 16px;">
                 <h3 style="margin: 0 0 6px 0; font-size: 18px;">1. Check In Now</h3>
                 <p style="margin: 0; font-size: 15px; color: #374151;">
-                    Open the Odoo mobile app (or the browser), tap <strong>Check In &gt; Check In Now</strong>, allow location
+                    Open the Odoo mobile app (or the browser), tap <strong>Sale Check &gt; Check In Now</strong>, allow location
                     access when asked. The GPS position is captured automatically; tap <strong>Capture GPS</strong> to refresh it
                     and <strong>Open in Google Maps</strong> to verify it. Select the customer and the activity type, add a
                     purpose or a photo, and save.
@@ -182,7 +182,7 @@
                 <h3 style="margin: 0 0 6px 0; font-size: 18px;">3. Check Out</h3>
                 <p style="margin: 0; font-size: 15px; color: #374151;">
                     Tap <strong>Check Out</strong> when leaving: the check-out position and the visit duration are recorded and
-                    the manager is notified. Planned visits can be prepared in advance (Check In &gt; Planned Visits) and
+                    the manager is notified. Planned visits can be prepared in advance (Sale Check &gt; Planned Visits) and
                     checked in with one tap on the day.
                 </p>
             </div>
@@ -211,11 +211,11 @@
             </thead>
             <tbody>
                 <tr style="border-bottom: 1px solid #e5e7eb;">
-                    <td style="padding: 10px 12px; font-weight: 600;">Check In / Salesperson</td>
+                    <td style="padding: 10px 12px; font-weight: 600;">Sale Check / Salesperson</td>
                     <td style="padding: 10px 12px;">Create check-ins for their own visits, see their own check-ins, targets and reports (and those of their direct reports).</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px 12px; font-weight: 600;">Check In / Manager</td>
+                    <td style="padding: 10px 12px; font-weight: 600;">Sale Check / Manager</td>
                     <td style="padding: 10px 12px;">Everything: all check-ins, targets, activity types, Telegram settings and logs, sending reports.</td>
                 </tr>
             </tbody>
@@ -224,7 +224,7 @@
 </section>
 
 <footer style="background: #0a544e; color: #ccfbf1; padding: 24px; text-align: center; font-size: 14px;">
-    Check In Sales Activity &middot; Odoo 18 &middot; License LGPL-3
+    Sale Check &middot; Odoo 18 &middot; License LGPL-3
 </footer>
 
 </body>

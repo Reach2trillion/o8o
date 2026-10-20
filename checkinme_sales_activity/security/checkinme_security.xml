@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="module_category_checkinme" model="ir.module.category">
-        <field name="name">Check In Sales Activity</field>
-        <field name="description">Access rights for the Check In Sales Activity application.</field>
+        <field name="name">Sale Check</field>
+        <field name="description">Access rights for the Sale Check application.</field>
         <field name="sequence">25</field>
     </record>
 

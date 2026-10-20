@@ -2,7 +2,7 @@
 <odoo>
 
     <!-- ================================================================ -->
-    <!-- Settings > Check In                                              -->
+    <!-- Settings > Sale Check                                              -->
     <!-- ================================================================ -->
     <record id="res_config_settings_view_form_checkinme" model="ir.ui.view">
         <field name="name">res.config.settings.view.form.inherit.checkinme</field>
@@ -11,7 +11,7 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="Check In" string="Check In" name="checkinme_sales_activity"
+                <app data-string="Sale Check" string="Sale Check" name="checkinme_sales_activity"
                      groups="checkinme_sales_activity.group_checkinme_manager">
 
                     <!-- Telegram -->
@@ -57,15 +57,15 @@
                     <!-- Automatic reports -->
                     <block title="Automatic Reports" name="checkinme_reports_setting_container">
                         <setting id="checkinme_daily_report_setting" string="Daily Report"
-                                 help="Every evening, send the activity summary of the day (visits, verified visits, new customers, orders and sales per salesperson) to the managers' Telegram chat. The sending time is editable under Settings &gt; Technical &gt; Scheduled Actions (Check In: Daily Telegram Activity Report).">
+                                 help="Every evening, send the activity summary of the day (visits, verified visits, new customers, orders and sales per salesperson) to the managers' Telegram chat. The sending time is editable under Settings &gt; Technical &gt; Scheduled Actions (Sale Check: Daily Telegram Activity Report).">
                             <field name="checkinme_daily_report"/>
                         </setting>
                         <setting id="checkinme_weekly_report_setting" string="Weekly Report"
-                                 help="Every Monday morning, send the report of the previous week with the progress towards the monthly targets. The schedule is editable under Settings &gt; Technical &gt; Scheduled Actions (Check In: Weekly Telegram Activity Report).">
+                                 help="Every Monday morning, send the report of the previous week with the progress towards the monthly targets. The schedule is editable under Settings &gt; Technical &gt; Scheduled Actions (Sale Check: Weekly Telegram Activity Report).">
                             <field name="checkinme_weekly_report"/>
                         </setting>
                         <setting id="checkinme_monthly_report_setting" string="Monthly Report"
-                                 help="On the 1st of each month, send the results of the previous month against the KPI targets of every salesperson. The schedule is editable under Settings &gt; Technical &gt; Scheduled Actions (Check In: Monthly Telegram Activity Report).">
+                                 help="On the 1st of each month, send the results of the previous month against the KPI targets of every salesperson. The schedule is editable under Settings &gt; Technical &gt; Scheduled Actions (Sale Check: Monthly Telegram Activity Report).">
                             <field name="checkinme_monthly_report"/>
                         </setting>
                     </block>

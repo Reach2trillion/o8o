@@ -69,7 +69,7 @@ class CheckinmeReportWizard(models.TransientModel):
     def action_send_telegram(self):
         self.ensure_one()
         if not self.env.user.has_group('checkinme_sales_activity.group_checkinme_manager'):
-            raise UserError(_("Only Check In managers can send reports to Telegram."))
+            raise UserError(_("Only Sale Check managers can send reports to Telegram."))
         if not self.telegram_chat_id:
             raise UserError(_("Please enter the Telegram chat id to send the report to."))
         ok, _text = self.env['checkinme.telegram']._send_period_report(
