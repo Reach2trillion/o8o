@@ -1,15 +1,23 @@
-// CheckinMe phone screen (lazy bundle checkinme_sales_activity.assets_screen)
-$checkinme-primary: #0f766e;
-$checkinme-primary-dark: #0b5d57;
-$checkinme-bg: #f3f5f7;
-$checkinme-card: #ffffff;
-$checkinme-border: #e3e7eb;
-$checkinme-muted: #6b7280;
+// Sale Check phone screen (lazy bundle checkinme_sales_activity.assets_screen)
+// Palette: ABJ SkinCare brand (company document layout): taupe accent, deep slate text, rose-gold lines, cream surfaces.
+$abj-taupe: #a58a76;
+$abj-taupe-dark: #8a7261;
+$abj-taupe-tint: #f3ece6;
+$abj-rose: #c9a08a;
+$abj-slate: #22343a;
+$abj-slate-soft: #5d6d72;
+$abj-cream: #faf6f0;
+$abj-cream-deep: #fdfaf5;
+$abj-line: #e5d8cb;
+$abj-line-soft: #f0e6d8;
+$abj-muted: #a09383;
+$abj-serif: 'Playfair Display', 'Noto Serif', 'DejaVu Serif', Georgia, serif;
 
 .o_checkinme_screen {
     height: 100%;
     overflow-y: auto;
-    background: $checkinme-bg;
+    background: $abj-cream;
+    color: $abj-slate;
     -webkit-overflow-scrolling: touch;
 
     .o_checkinme_screen_body {
@@ -28,129 +36,140 @@ $checkinme-muted: #6b7280;
         align-items: center;
         gap: 0.5rem;
         padding: 0.75rem 1rem;
-        background: $checkinme-primary;
+        background: $abj-slate;
         color: #fff;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        border-top: 3px solid $abj-rose;
+        box-shadow: 0 2px 8px rgba(34, 52, 58, 0.25);
     }
     .o_checkinme_topbar_text { flex: 1 1 auto; min-width: 0; }
-    .o_checkinme_topbar_title { font-size: 1.15rem; font-weight: 700; line-height: 1.2; }
-    .o_checkinme_topbar_sub { font-size: 0.8rem; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .o_checkinme_topbar_title { font-family: $abj-serif; font-size: 1.3rem; font-weight: 500; line-height: 1.2; letter-spacing: 0.01em; }
+    .o_checkinme_topbar_sub { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: $abj-rose; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .o_checkinme_topbar_btn {
         flex: 0 0 auto;
         width: 44px;
         height: 44px;
-        border: 0;
+        border: 1px solid rgba(201, 160, 138, 0.5);
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
         color: #fff;
-        font-size: 1.1rem;
-        &:active { background: rgba(255, 255, 255, 0.3); }
+        font-size: 1.05rem;
+        &:active { background: rgba(201, 160, 138, 0.35); }
     }
 
     .o_checkinme_main {
         flex: 1 1 auto;
         padding: 1rem 1rem calc(1.5rem + env(safe-area-inset-bottom, 0));
     }
-    .o_checkinme_loading { text-align: center; padding: 4rem 0; color: $checkinme-muted; }
+    .o_checkinme_loading { text-align: center; padding: 4rem 0; color: $abj-taupe; }
 
     .o_checkinme_card {
-        background: $checkinme-card;
-        border: 1px solid $checkinme-border;
-        border-radius: 14px;
+        background: #fff;
+        border: 1px solid $abj-line-soft;
+        border-radius: 12px;
         padding: 1rem;
         margin-bottom: 1rem;
-        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+        box-shadow: 0 1px 2px rgba(34, 52, 58, 0.04);
     }
     .o_checkinme_card_warning { background: #fff8e6; border-color: #ffe2a8; color: #7a4b00; }
-    .o_checkinme_card_open { border-color: $checkinme-primary; box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15); }
-    .o_checkinme_card_title { font-weight: 600; color: #111827; margin-bottom: 0.75rem; }
-    .o_checkinme_visit_name { font-size: 1.25rem; font-weight: 700; color: #111827; }
-    .o_checkinme_muted { color: $checkinme-muted; font-size: 0.875rem; }
-    .o_checkinme_mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95rem; }
-    .o_checkinme_label { display: block; font-size: 0.8rem; font-weight: 600; color: $checkinme-muted; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.02em; }
-    .o_checkinme_section_label { font-size: 0.8rem; font-weight: 700; color: $checkinme-muted; text-transform: uppercase; letter-spacing: 0.04em; margin: 0.25rem 0 0.5rem 0.25rem; }
-    .o_checkinme_footer { text-align: center; padding: 0.5rem 0 1rem; font-size: 0.875rem; }
+    .o_checkinme_card_open { border-color: $abj-rose; box-shadow: 0 0 0 2px rgba(201, 160, 138, 0.25); }
+    .o_checkinme_card_title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: $abj-taupe; margin-bottom: 0.75rem; }
+    .o_checkinme_visit_name { font-family: $abj-serif; font-size: 1.35rem; font-weight: 500; color: $abj-slate; line-height: 1.2; }
+    .o_checkinme_muted { color: $abj-slate-soft; font-size: 0.875rem; }
+    .o_checkinme_mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95rem; color: $abj-slate; }
+    .o_checkinme_label { display: block; font-size: 0.72rem; font-weight: 700; color: $abj-taupe; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.14em; }
+    .o_checkinme_section_label { font-size: 0.72rem; font-weight: 700; color: $abj-taupe; text-transform: uppercase; letter-spacing: 0.16em; margin: 0.25rem 0 0.5rem 0.25rem; }
+    .o_checkinme_footer { text-align: center; padding: 0.5rem 0 1rem; font-size: 0.875rem; a { color: $abj-taupe-dark; } }
 
     .o_checkinme_dot {
-        display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #16a34a; margin-right: 0.5rem;
-        box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.2);
+        display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3f8a5c; margin-right: 0.5rem;
+        box-shadow: 0 0 0 4px rgba(63, 138, 92, 0.2);
     }
 
     .o_checkinme_stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
-    .o_checkinme_stat { text-align: center; background: $checkinme-bg; border-radius: 10px; padding: 0.5rem 0.25rem; }
-    .o_checkinme_stat_value { font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
-    .o_checkinme_stat_label { font-size: 0.7rem; color: $checkinme-muted; text-transform: uppercase; letter-spacing: 0.03em; }
+    .o_checkinme_stat { text-align: center; background: $abj-cream; border: 1px solid $abj-line-soft; border-radius: 10px; padding: 0.5rem 0.25rem; }
+    .o_checkinme_stat_value { font-family: $abj-serif; font-size: 1.5rem; font-weight: 500; line-height: 1.2; color: $abj-slate; }
+    .o_checkinme_stat_label { font-size: 0.62rem; color: $abj-muted; text-transform: uppercase; letter-spacing: 0.1em; }
 
     .o_checkinme_row { display: flex; gap: 0.5rem; align-items: stretch; }
-    .o_checkinme_btn_xl { min-height: 60px; font-size: 1.2rem; font-weight: 700; border-radius: 14px; margin-bottom: 1rem; }
-    .o_checkinme_btn_lg { min-height: 50px; font-size: 1rem; font-weight: 600; border-radius: 12px; }
+    .o_checkinme_btn_xl { min-height: 60px; font-size: 1.1rem; font-weight: 700; letter-spacing: 0.04em; border-radius: 12px; margin-bottom: 1rem; }
+    .o_checkinme_btn_lg { min-height: 50px; font-size: 1rem; font-weight: 600; border-radius: 10px; }
     .o_checkinme_btn_md { min-height: 44px; border-radius: 10px; }
-    .btn-primary { background: $checkinme-primary; border-color: $checkinme-primary; &:hover, &:active, &:focus { background: $checkinme-primary-dark; border-color: $checkinme-primary-dark; } }
-    .btn-outline-primary { color: $checkinme-primary; border-color: $checkinme-primary; &:hover, &:active { background: $checkinme-primary; border-color: $checkinme-primary; color: #fff; } }
+    .btn-primary {
+        background: $abj-taupe; border-color: $abj-taupe; color: #fff;
+        &:hover, &:active, &:focus { background: $abj-taupe-dark; border-color: $abj-taupe-dark; color: #fff; }
+        &:disabled { background: $abj-taupe; border-color: $abj-taupe; opacity: 0.5; }
+    }
+    .btn-outline-primary {
+        color: $abj-taupe-dark; border-color: $abj-taupe; background: #fff;
+        &:hover, &:active { background: $abj-taupe; border-color: $abj-taupe; color: #fff; }
+    }
+    .btn-outline-secondary { color: $abj-slate; border-color: $abj-line; background: #fff; &:hover, &:active { background: $abj-cream; color: $abj-slate; border-color: $abj-rose; } }
+    .btn-link { color: $abj-taupe-dark; }
 
-    .o_checkinme_progress_row { margin-bottom: 0.6rem; font-size: 0.9rem; }
-    .o_checkinme_progress { height: 10px; background: $checkinme-bg; border-radius: 999px; overflow: hidden; margin-top: 0.25rem; }
-    .o_checkinme_progress_bar { height: 100%; background: $checkinme-primary; border-radius: 999px; transition: width 0.3s ease; }
+    .o_checkinme_progress_row { margin-bottom: 0.6rem; font-size: 0.9rem; color: $abj-slate; }
+    .o_checkinme_progress { height: 8px; background: $abj-taupe-tint; border-radius: 999px; overflow: hidden; margin-top: 0.3rem; }
+    .o_checkinme_progress_bar { height: 100%; background: linear-gradient(90deg, $abj-rose, $abj-taupe); border-radius: 999px; transition: width 0.3s ease; }
 
     .o_checkinme_badge {
-        display: inline-block; padding: 0.2rem 0.55rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;
-        background: #e5e7eb; color: #374151; white-space: nowrap;
+        display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+        background: $abj-taupe-tint; color: $abj-slate; white-space: nowrap;
     }
-    .o_checkinme_badge_verified, .o_checkinme_badge_achieved, .o_checkinme_badge_on_track { background: #dcfce7; color: #166534; }
-    .o_checkinme_badge_far, .o_checkinme_badge_at_risk { background: #fef3c7; color: #92400e; }
-    .o_checkinme_badge_no_gps, .o_checkinme_badge_behind { background: #fee2e2; color: #991b1b; }
-    .o_checkinme_badge_unknown, .o_checkinme_badge_none, .o_checkinme_badge_upcoming { background: #e0f2fe; color: #075985; }
-    .o_checkinme_badge_distance { background: #ccfbf1; color: $checkinme-primary-dark; }
+    .o_checkinme_badge_verified, .o_checkinme_badge_achieved, .o_checkinme_badge_on_track { background: #e4efe7; color: #2f6b48; }
+    .o_checkinme_badge_far, .o_checkinme_badge_at_risk { background: #f7e9d2; color: #8a5a14; }
+    .o_checkinme_badge_no_gps, .o_checkinme_badge_behind { background: #f6dede; color: #8f2d2d; }
+    .o_checkinme_badge_unknown, .o_checkinme_badge_none, .o_checkinme_badge_upcoming { background: #e7ecee; color: $abj-slate-soft; }
+    .o_checkinme_badge_distance { background: $abj-cream; border: 1px solid $abj-line; color: $abj-taupe-dark; }
 
     .o_checkinme_list_item {
         display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 0.25rem;
-        border-top: 1px solid $checkinme-border;
+        border-top: 1px solid $abj-line-soft;
         &:first-of-type { border-top: 0; }
     }
-    .o_checkinme_clickable { cursor: pointer; &:active { background: $checkinme-bg; } }
+    .o_checkinme_clickable { cursor: pointer; &:active { background: $abj-cream; } }
     .o_checkinme_list_main { flex: 1 1 auto; min-width: 0; }
-    .o_checkinme_list_title { font-weight: 600; color: #111827; overflow: hidden; text-overflow: ellipsis; }
-    .o_checkinme_list_time { flex: 0 0 auto; min-width: 3rem; font-weight: 600; color: $checkinme-muted; font-size: 0.85rem; }
+    .o_checkinme_list_title { font-weight: 700; color: $abj-slate; overflow: hidden; text-overflow: ellipsis; }
+    .o_checkinme_list_time { flex: 0 0 auto; min-width: 3rem; font-weight: 700; color: $abj-taupe; font-size: 0.85rem; }
 
     .o_checkinme_steps {
         display: flex; list-style: none; padding: 0; margin: 0 0 1rem; gap: 0.25rem;
         li {
-            flex: 1 1 0; text-align: center; font-size: 0.75rem; color: $checkinme-muted; padding-bottom: 0.35rem;
-            border-bottom: 3px solid $checkinme-border;
-            span { display: inline-block; width: 1.4rem; height: 1.4rem; line-height: 1.4rem; border-radius: 50%; background: $checkinme-border; color: #374151; font-weight: 700; margin-right: 0.3rem; }
-            &.active { color: $checkinme-primary; border-color: $checkinme-primary; font-weight: 600; span { background: $checkinme-primary; color: #fff; } }
-            &.done { color: #166534; border-color: #16a34a; span { background: #16a34a; color: #fff; } }
+            flex: 1 1 0; text-align: center; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: $abj-muted; padding-bottom: 0.4rem;
+            border-bottom: 2px solid $abj-line;
+            span { display: inline-block; width: 1.4rem; height: 1.4rem; line-height: 1.4rem; border-radius: 50%; background: $abj-line; color: $abj-slate; font-weight: 700; margin-right: 0.3rem; letter-spacing: 0; }
+            &.active { color: $abj-taupe-dark; border-color: $abj-taupe; font-weight: 700; span { background: $abj-taupe; color: #fff; } }
+            &.done { color: $abj-slate; border-color: $abj-slate; span { background: $abj-slate; color: #fff; } }
         }
     }
-    .o_checkinme_geo_icon { font-size: 3rem; line-height: 1; margin: 0.5rem 0 0.75rem; color: $checkinme-primary; }
+    .o_checkinme_geo_icon { font-size: 3rem; line-height: 1; margin: 0.5rem 0 0.75rem; color: $abj-taupe; }
 
     .o_checkinme_search {
         position: relative; margin-bottom: 0.75rem;
-        i { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: $checkinme-muted; }
-        input { padding-left: 2.4rem; min-height: 48px; border-radius: 12px; font-size: 1rem; }
+        i { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: $abj-taupe; }
+        input { padding-left: 2.4rem; min-height: 48px; border-radius: 10px; font-size: 1rem; border-color: $abj-line; background: #fff; }
     }
 
     .o_checkinme_tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
     .o_checkinme_tiles_outcome { grid-template-columns: repeat(2, 1fr); }
     .o_checkinme_tile {
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.35rem;
-        min-height: 74px; padding: 0.5rem 0.25rem; border-radius: 12px; border: 1px solid $checkinme-border;
-        background: $checkinme-card; color: #374151; font-size: 0.8rem; line-height: 1.15;
-        i { font-size: 1.4rem; color: $checkinme-primary; }
-        &.active { background: $checkinme-primary; border-color: $checkinme-primary; color: #fff; i { color: #fff; } }
+        min-height: 74px; padding: 0.5rem 0.25rem; border-radius: 10px; border: 1px solid $abj-line;
+        background: #fff; color: $abj-slate; font-size: 0.78rem; line-height: 1.15;
+        i { font-size: 1.4rem; color: $abj-taupe; }
+        &.active { background: $abj-slate; border-color: $abj-slate; color: #fff; i { color: $abj-rose; } }
     }
 
     .o_checkinme_photo {
         position: relative; margin-bottom: 0.5rem;
-        img { width: 100%; max-height: 240px; object-fit: cover; border-radius: 12px; }
+        img { width: 100%; max-height: 240px; object-fit: cover; border-radius: 10px; border: 1px solid $abj-line-soft; }
         button { position: absolute; top: 0.5rem; right: 0.5rem; }
     }
 
-    .form-control { min-height: 44px; font-size: 1rem; border-radius: 10px; }
+    .form-control { min-height: 44px; font-size: 1rem; border-radius: 10px; border-color: $abj-line; color: $abj-slate; &:focus { border-color: $abj-taupe; box-shadow: 0 0 0 0.2rem rgba(165, 138, 118, 0.25); } }
     textarea.form-control { min-height: 80px; }
+    a { color: $abj-taupe-dark; }
 }
 
 @media (max-width: 575.98px) {
     .o_checkinme_screen .o_checkinme_main { padding-left: 0.75rem; padding-right: 0.75rem; }
-    .o_checkinme_screen .o_checkinme_stat_value { font-size: 1.2rem; }
+    .o_checkinme_screen .o_checkinme_stat_value { font-size: 1.25rem; }
 }
