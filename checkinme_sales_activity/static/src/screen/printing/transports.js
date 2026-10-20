@@ -53,6 +53,8 @@ function nativeErrorMessage(error) {
             return _t("Could not connect to the printer. Check that it is switched on, paired with this phone and not connected to another phone.");
         case "WRITE_FAILED":
             return _t("The connection to the printer was lost while printing.");
+        case "TIMEOUT":
+            return _t("The printer stopped accepting data. Check its paper and cover, then print again.");
         default:
             return error?.message || _t("The printer did not respond.");
     }
