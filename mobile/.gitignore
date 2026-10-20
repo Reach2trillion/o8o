@@ -1,0 +1,11 @@
+node_modules/
+
+# Per-deployment secrets: never commit them (see README.md, "Firebase" and "Release signing")
+google-services.json
+*-firebase-adminsdk-*.json
+*.jks
+*.keystore
+
+# Build outputs
+*.apk
+*.aab

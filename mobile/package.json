@@ -1,0 +1,26 @@
+{
+  "name": "abj-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ABJ Android app: a Capacitor shell around the Sale Check phone screen of the Odoo 18 server",
+  "license": "LGPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync": "cap sync android",
+    "build:debug": "cap sync android && cd android && ./gradlew assembleDebug",
+    "open": "cap open android",
+    "icons": "python3 scripts/make_icons.py"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/push-notifications": "8.1.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "typescript": "5.9.3"
+  }
+}

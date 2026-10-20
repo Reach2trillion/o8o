@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>ABJ</title>
+    <!--
+        Offline / fallback page of the ABJ Android app. The app normally loads the Odoo server
+        (capacitor.config.ts server.url); MainActivity shows this page only when that server cannot be
+        reached, after replacing __ABJ_APP_URL__ with the URL to retry.
+    -->
+    <style>
+        :root {
+            --abj-slate: #22343a;
+            --abj-taupe: #a58a76;
+            --abj-taupe-dark: #8a7261;
+            --abj-rose: #c9a08a;
+            --abj-cream: #f7f2ed;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            background: var(--abj-slate);
+            color: var(--abj-cream);
+            font-family: Lato, "Noto Sans Khmer", "Noto Sans", Roboto, sans-serif;
+            text-align: center;
+        }
+        main { width: 100%; max-width: 360px; }
+        .mark {
+            display: inline-block;
+            padding: 14px 22px 10px;
+            border: 2px solid var(--abj-rose);
+            border-radius: 18px;
+            font-family: "Playfair Display", "Noto Serif", Georgia, serif;
+            font-size: 40px;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+        .rule { width: 96px; height: 3px; margin: 18px auto 28px; background: var(--abj-rose); border-radius: 2px; }
+        h1 { margin: 0 0 8px; font-size: 20px; font-weight: 700; }
+        p { margin: 0 0 6px; font-size: 15px; line-height: 1.5; opacity: 0.85; }
+        .km { margin-top: 14px; }
+        button {
+            margin-top: 28px;
+            width: 100%;
+            min-height: 48px;
+            border: 0;
+            border-radius: 10px;
+            background: var(--abj-taupe);
+            color: #fff;
+            font: inherit;
+            font-size: 17px;
+            font-weight: 700;
+        }
+        button:active { background: var(--abj-taupe-dark); }
+        .host { margin-top: 18px; font-size: 12px; opacity: 0.55; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="mark">ABJ</div>
+        <div class="rule"></div>
+        <h1>Cannot reach the ABJ server</h1>
+        <p>Check the internet connection, then try again.</p>
+        <p class="km" lang="km">មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេ ABJ បានទេ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយព្យាយាមម្តងទៀត។</p>
+        <button type="button" id="retry">Try again · ព្យាយាមម្តងទៀត</button>
+        <div class="host" id="host"></div>
+    </main>
+    <script>
+        (function () {
+            var target = "__ABJ_APP_URL__";
+            var hasTarget = target.indexOf("__ABJ_") !== 0;
+            if (hasTarget) {
+                try {
+                    document.getElementById("host").textContent = new URL(target).host;
+                } catch (e) {
+                    // keep the page usable even with an unexpected URL
+                }
+            }
+            document.getElementById("retry").addEventListener("click", function () {
+                if (hasTarget) {
+                    window.location.replace(target);
+                } else {
+                    window.location.reload();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
