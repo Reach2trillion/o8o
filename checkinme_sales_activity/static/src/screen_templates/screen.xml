@@ -15,6 +15,9 @@
                     <button t-if="state.view !== 'history'" type="button" class="o_checkinme_topbar_btn" t-on-click="openHistory" aria-label="My visits" title="My visits">
                         <i class="fa fa-history"/>
                     </button>
+                    <button t-if="state.view !== 'settings'" type="button" class="o_checkinme_topbar_btn" t-on-click="openSettings" aria-label="App settings" title="App settings">
+                        <i class="fa fa-cog"/>
+                    </button>
                 </header>
                 <main class="o_checkinme_main">
                     <div t-if="state.loading" class="o_checkinme_loading"><i class="fa fa-spinner fa-spin fa-2x"/></div>
@@ -26,6 +29,7 @@
                     <t t-elif="state.view === 'checkout'" t-call="checkinme_sales_activity.ScreenCheckout"/>
                     <t t-elif="state.view === 'result'" t-call="checkinme_sales_activity.ScreenResult"/>
                     <t t-elif="state.view === 'history'" t-call="checkinme_sales_activity.ScreenHistory"/>
+                    <t t-elif="state.view === 'settings'" t-call="checkinme_sales_activity.ScreenSettings"/>
                 </main>
             </div>
         </div>
@@ -34,6 +38,12 @@
     <!-- ============================ HOME ============================ -->
     <t t-name="checkinme_sales_activity.ScreenHome">
         <t t-set="d" t-value="state.dashboard"/>
+        <div t-if="showPushBanner" class="o_checkinme_card o_abj_banner">
+            <i class="fa fa-bell o_abj_banner_icon"/>
+            <div class="o_checkinme_list_main">Turn on notifications to get planned visits</div>
+            <button type="button" class="btn btn-primary btn-sm o_checkinme_btn_md" t-on-click="enableNotifications" t-att-disabled="state.push.busy">Turn on</button>
+            <button type="button" class="btn btn-link o_abj_banner_close" t-on-click="dismissPushBanner" aria-label="Dismiss" title="Dismiss"><i class="fa fa-times"/></button>
+        </div>
         <div t-if="!d.employee.has_employee" class="o_checkinme_card o_checkinme_card_warning">
             <i class="fa fa-exclamation-triangle me-2"/>Your user is not linked to an employee. Ask your administrator to create your employee record before checking in.
         </div>
@@ -304,6 +314,20 @@
             </div>
             <a t-if="r.google_maps_url" t-att-href="r.google_maps_url" target="_blank" rel="noopener" class="btn btn-link"><i class="fa fa-map me-1"/>Open in Google Maps</a>
         </section>
+        <section t-if="printerReady and r.state !== 'draft'" class="o_checkinme_card o_abj_print_card">
+            <button type="button" class="btn btn-outline-primary o_checkinme_btn_lg w-100" t-on-click="() => this.printSlip(r)" t-att-disabled="state.printing">
+                <i t-if="isPrinting(r.id)" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-print me-2"/>Print slip
+            </button>
+            <button t-foreach="saleOrders(r)" t-as="order" t-key="order.id" type="button" class="btn btn-outline-secondary o_checkinme_btn_md o_abj_order_btn w-100 mt-2"
+                    t-on-click="() => this.printSlip(r, order)" t-att-disabled="state.printing">
+                <i t-if="isPrinting(r.id, order.id)" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-print me-2"/>
+                <span class="flex-grow-1 text-start">Print <t t-esc="order.name"/></span>
+                <span class="o_checkinme_muted"><t t-esc="order.state_label"/><t t-if="order.amount_total_display"> &#183; <t t-esc="order.amount_total_display"/></t></span>
+            </button>
+        </section>
+        <div t-elif="r.state !== 'draft'" class="o_checkinme_footer">
+            <a href="#" t-on-click.prevent="openSettings"><i class="fa fa-print me-1"/>Set up printer</a>
+        </div>
         <div class="o_checkinme_row">
             <button type="button" class="btn btn-outline-secondary o_checkinme_btn_lg" t-on-click="() => this.openRecord(r.id)"><i class="fa fa-pencil me-2"/>Edit</button>
             <button t-if="r.state === 'checked_in'" type="button" class="btn btn-outline-primary o_checkinme_btn_lg" t-on-click="() => this.startCheckout(r)"><i class="fa fa-flag-checkered me-2"/>Check Out</button>
@@ -314,7 +338,10 @@
     <!-- ============================ HISTORY ============================ -->
     <t t-name="checkinme_sales_activity.ScreenHistory">
         <section class="o_checkinme_card">
-            <div class="o_checkinme_card_title"><i class="fa fa-history me-2"/>Recent visits</div>
+            <div class="o_checkinme_card_title d-flex align-items-center">
+                <span><i class="fa fa-history me-2"/>Recent visits</span>
+                <a t-if="!printerReady" href="#" class="ms-auto o_abj_link_small" t-on-click.prevent="openSettings"><i class="fa fa-print me-1"/>Set up printer</a>
+            </div>
             <div t-if="!state.history.length" class="o_checkinme_muted">No visit yet.</div>
             <div t-foreach="state.history" t-as="visit" t-key="visit.id" class="o_checkinme_list_item o_checkinme_clickable" t-on-click="() => this.openVisit(visit.id)">
                 <div class="o_checkinme_list_time"><div t-esc="visit.checkin_date_local"/><div class="o_checkinme_muted" t-esc="visit.checkin_time_local"/></div>
@@ -323,7 +350,149 @@
                     <div class="o_checkinme_muted"><t t-esc="visit.type_name"/> &#183; <t t-esc="visit.state_label"/><t t-if="visit.outcome_label"> &#183; <t t-esc="visit.outcome_label"/></t></div>
                 </div>
                 <span t-attf-class="o_checkinme_badge o_checkinme_badge_{{ visit.location_status }}" t-esc="visit.location_status_label"/>
+                <button t-if="printerReady and visit.state !== 'draft'" type="button" class="btn btn-outline-secondary o_abj_icon_btn"
+                        t-on-click.stop="() => this.printSlip(visit)" t-att-disabled="state.printing" aria-label="Print slip" title="Print slip">
+                    <i t-if="isPrinting(visit.id)" class="fa fa-spinner fa-spin"/><i t-else="" class="fa fa-print"/>
+                </button>
             </div>
+        </section>
+    </t>
+
+
+    <!-- ============================ SETTINGS ============================ -->
+    <t t-name="checkinme_sales_activity.ScreenSettings">
+        <t t-set="ns" t-value="notificationState"/>
+        <section class="o_checkinme_card o_abj_settings_notifications">
+            <div class="o_checkinme_card_title d-flex align-items-center">
+                <span><i class="fa fa-bell me-2"/>Notifications</span>
+                <span t-attf-class="o_checkinme_badge ms-auto o_checkinme_badge_{{ ns.badge }}" t-esc="ns.label"/>
+            </div>
+            <div class="o_checkinme_muted mb-3">Planned visits, follow-up reminders and Odoo messages on this phone.</div>
+            <div t-if="ns.hint" class="o_abj_hint mb-3" t-esc="ns.hint"/>
+            <div t-if="!serverPushReady" class="o_abj_hint o_abj_hint_warning mb-3">
+                <i class="fa fa-exclamation-triangle me-1"/>The server cannot send notifications to this kind of device yet. Ask your administrator.
+            </div>
+            <t t-if="isNative">
+                <button t-if="canEnableNativePush and nativePush.permission !== 'denied'" type="button" class="btn btn-primary o_checkinme_btn_lg w-100 mb-2"
+                        t-on-click="enableNativeNotifications" t-att-disabled="state.push.busy">
+                    <i class="fa fa-bell me-2"/>Enable notifications
+                </button>
+                <button t-if="nativePush.available and nativePush.permission === 'denied'" type="button" class="btn btn-outline-primary o_checkinme_btn_md w-100 mb-2" t-on-click="openAppSettings">
+                    <i class="fa fa-cog me-2"/>Open app settings
+                </button>
+            </t>
+            <t t-elif="canEnableWebPush">
+                <button t-if="state.push.status === 'prompt'" type="button" class="btn btn-primary o_checkinme_btn_lg w-100 mb-2"
+                        t-on-click="enableNotifications" t-att-disabled="state.push.busy">
+                    <i t-if="state.push.busy" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-bell me-2"/>Enable notifications
+                </button>
+                <a t-else="" href="#" class="d-block mb-2 o_abj_link_small" t-on-click.prevent="enableNotifications">Register this device again</a>
+            </t>
+            <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100" t-on-click="sendTestPush" t-att-disabled="state.push.testing">
+                <i t-if="state.push.testing" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-paper-plane me-2"/>Send test notification
+            </button>
+        </section>
+
+        <section class="o_checkinme_card o_abj_settings_printer">
+            <div class="o_checkinme_card_title"><i class="fa fa-print me-2"/>Printer</div>
+            <div class="o_checkinme_section_label">Connection</div>
+            <div class="o_abj_options">
+                <label t-foreach="transports" t-as="option" t-key="option.id" t-attf-class="o_abj_option {{ option.id === state.printer.transport ? 'active' : '' }}">
+                    <input type="radio" name="abj_transport" class="form-check-input" t-att-value="option.id"
+                           t-att-checked="option.id === state.printer.transport" t-on-change="() => this.chooseTransport(option.id)"/>
+                    <span class="o_abj_option_text">
+                        <span class="o_abj_option_label" t-esc="option.label"/>
+                        <span class="o_checkinme_muted" t-esc="option.help"/>
+                    </span>
+                </label>
+            </div>
+            <t t-set="transport" t-value="currentTransport"/>
+            <t t-if="transport">
+                <t t-if="transport.picker === 'list'">
+                    <div class="o_checkinme_section_label mt-3">Paired printers</div>
+                    <div t-if="state.printerUi.loadingDevices" class="o_checkinme_muted"><i class="fa fa-spinner fa-spin me-1"/>Looking for paired devices...</div>
+                    <div t-elif="!state.printerUi.devices.length" class="o_checkinme_muted">No paired printer found. Pair the printer in the phone's Bluetooth settings first.</div>
+                    <div t-foreach="state.printerUi.devices" t-as="device" t-key="device.id"
+                         t-attf-class="o_checkinme_list_item o_checkinme_clickable {{ device.id === state.printer.deviceId ? 'o_abj_selected' : '' }}" t-on-click="() => this.pickPrinterDevice(device)">
+                        <i t-attf-class="fa {{ device.likelyPrinter ? 'fa-print' : 'fa-bluetooth-b' }} o_checkinme_muted"/>
+                        <div class="o_checkinme_list_main">
+                            <div class="o_checkinme_list_title" t-esc="device.name"/>
+                            <div class="o_checkinme_muted" t-esc="device.id"/>
+                        </div>
+                        <i t-if="device.id === state.printer.deviceId" class="fa fa-check-circle text-success"/>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mt-2" t-on-click="loadPrinterDevices" t-att-disabled="state.printerUi.loadingDevices">
+                        <i class="fa fa-refresh me-2"/>Refresh the list
+                    </button>
+                </t>
+                <t t-elif="transport.picker === 'chooser'">
+                    <div class="o_checkinme_section_label mt-3">Printer</div>
+                    <div class="mb-2">
+                        <span t-if="state.printer.deviceName" class="o_checkinme_list_title" t-esc="state.printer.deviceName"/>
+                        <span t-else="" class="o_checkinme_muted">No printer selected</span>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary o_checkinme_btn_md w-100" t-on-click="() => this.choosePrinter()" t-att-disabled="state.printerUi.busy">
+                        <i class="fa fa-search me-2"/>Choose printer
+                    </button>
+                    <a href="#" class="d-block mt-2 o_abj_link_small" t-on-click.prevent="() => this.choosePrinter(true)">Printer not listed? Show all devices</a>
+                </t>
+                <t t-elif="transport.picker === 'address'">
+                    <div class="o_checkinme_section_label mt-3">Printer address</div>
+                    <div class="o_checkinme_row">
+                        <input type="text" inputmode="decimal" class="form-control flex-grow-1" placeholder="192.168.1.50" aria-label="IP address"
+                               t-att-value="state.printer.host" t-on-change="(ev) => this.setPrinterOption('host', ev.target.value)"/>
+                        <input type="number" inputmode="numeric" min="1" max="65535" class="form-control o_abj_port" aria-label="Port"
+                               t-att-value="state.printer.port" t-on-change="(ev) => this.setPrinterOption('port', ev.target.value)"/>
+                    </div>
+                </t>
+
+                <div class="o_checkinme_section_label mt-3">Paper width</div>
+                <div class="o_abj_segmented">
+                    <button t-foreach="paperWidths" t-as="paper" t-key="paper.dots" type="button"
+                            t-attf-class="btn {{ paper.dots === state.printer.widthDots ? 'btn-primary' : 'btn-outline-secondary' }}"
+                            t-on-click="() => this.setPrinterOption('widthDots', paper.dots)"><t t-esc="paper.mm"/> mm</button>
+                </div>
+
+                <label t-if="transport.needsBytes" class="form-check form-switch o_abj_switch mt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" t-att-checked="state.printer.cut"
+                           t-on-change="(ev) => this.setPrinterOption('cut', ev.target.checked)"/>
+                    <span class="form-check-label">Cut the paper after printing</span>
+                </label>
+                <label class="form-check form-switch o_abj_switch">
+                    <input class="form-check-input" type="checkbox" role="switch" t-att-checked="state.printer.autoPrint"
+                           t-on-change="(ev) => this.setPrinterOption('autoPrint', ev.target.checked)"/>
+                    <span class="form-check-label">Print the visit slip after each check-out</span>
+                </label>
+                <div t-if="transport.needsBytes" class="d-flex align-items-center gap-2 mt-2">
+                    <span class="o_checkinme_muted">Copies</span>
+                    <select class="form-select o_abj_copies" aria-label="Copies" t-on-change="(ev) => this.setPrinterOption('copies', ev.target.value)">
+                        <option t-foreach="copiesOptions" t-as="count" t-key="count" t-att-value="count" t-att-selected="count === state.printer.copies" t-esc="count"/>
+                    </select>
+                </div>
+
+                <button type="button" class="btn btn-primary o_checkinme_btn_lg w-100 mt-3" t-on-click="printTestPage" t-att-disabled="state.printerUi.busy or !printerReady">
+                    <i t-if="state.printerUi.busy" class="fa fa-spinner fa-spin me-2"/><i t-else="" class="fa fa-print me-2"/>Print test page
+                </button>
+                <img t-if="state.printerUi.preview" class="o_abj_receipt_preview mt-3" t-att-src="state.printerUi.preview" alt="Test page"/>
+            </t>
+            <div t-else="" class="o_checkinme_muted mt-2">Choose how this phone reaches the receipt printer.</div>
+        </section>
+
+        <section class="o_checkinme_card o_abj_settings_app">
+            <div class="o_checkinme_card_title"><i class="fa fa-mobile me-2"/>App</div>
+            <div class="o_abj_kv"><span class="o_checkinme_muted">App</span><span t-esc="app.name or 'ABJ'"/></div>
+            <div class="o_abj_kv"><span class="o_checkinme_muted">Running as</span><span t-esc="appModeLabel"/></div>
+            <div t-if="app.server_version" class="o_abj_kv"><span class="o_checkinme_muted">Server</span><span>Odoo <t t-esc="app.server_version"/></span></div>
+            <div t-if="app.company and app.company.name" class="o_abj_kv"><span class="o_checkinme_muted">Company</span><span t-esc="app.company.name"/></div>
+            <div t-if="!isNative and !isStandalone" class="o_abj_hint mt-3">
+                <div class="o_checkinme_list_title mb-1"><i class="fa fa-download me-1"/>Install ABJ on this phone</div>
+                <div t-if="isIOS" class="o_checkinme_muted">Open this page in Safari, then tap Share &gt; Add to Home Screen. Notifications need iOS 16.4 or later.</div>
+                <div t-else="" class="o_checkinme_muted">Open the install page and tap "Install", or use the browser menu &gt; Add to Home screen.</div>
+                <a t-att-href="installUrl" class="btn btn-outline-primary o_checkinme_btn_md w-100 mt-2"><i class="fa fa-download me-2"/>Install page</a>
+            </div>
+            <button type="button" class="btn btn-outline-secondary o_checkinme_btn_md w-100 mt-3" t-on-click="openFullOdoo">
+                <i class="fa fa-th me-2"/>Open full Odoo
+            </button>
         </section>
     </t>
 

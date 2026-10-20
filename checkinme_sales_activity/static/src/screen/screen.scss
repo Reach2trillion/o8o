@@ -167,9 +167,78 @@ $abj-serif: 'Playfair Display', 'Noto Serif', 'DejaVu Serif', Georgia, serif;
     .form-control { min-height: 44px; font-size: 1rem; border-radius: 10px; border-color: $abj-line; color: $abj-slate; &:focus { border-color: $abj-taupe; box-shadow: 0 0 0 0.2rem rgba(165, 138, 118, 0.25); } }
     textarea.form-control { min-height: 80px; }
     a { color: $abj-taupe-dark; }
+
+    // ---------------------------------------------------------------- ABJ app: banner, settings, printing
+    .o_abj_banner {
+        display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.5rem 0.75rem 1rem;
+        background: $abj-taupe-tint; border-color: $abj-rose; font-weight: 600;
+    }
+    .o_abj_banner_icon { font-size: 1.3rem; color: $abj-taupe-dark; }
+    .o_abj_banner .btn { flex: 0 0 auto; white-space: nowrap; }
+    .o_abj_banner_close { min-width: 44px; min-height: 44px; padding: 0; color: $abj-slate-soft; }
+    .o_abj_hint { background: $abj-cream; border: 1px solid $abj-line-soft; border-radius: 10px; padding: 0.6rem 0.75rem; font-size: 0.875rem; color: $abj-slate; }
+    .o_abj_hint_warning { background: #fff8e6; border-color: #ffe2a8; color: #7a4b00; }
+    .o_abj_link_small { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
+
+    .o_abj_options { display: flex; flex-direction: column; gap: 0.5rem; }
+    .o_abj_option {
+        display: flex; align-items: flex-start; gap: 0.75rem; margin: 0; padding: 0.7rem 0.8rem; cursor: pointer;
+        border: 1px solid $abj-line; border-radius: 10px; background: #fff;
+        .form-check-input { flex: 0 0 auto; margin: 0.2rem 0 0; }
+        .form-check-input:checked { background-color: $abj-taupe; border-color: $abj-taupe; }
+        &.active { border-color: $abj-taupe; background: $abj-taupe-tint; }
+    }
+    .o_abj_option_text { display: flex; flex-direction: column; min-width: 0; }
+    .o_abj_option_label { font-weight: 700; color: $abj-slate; }
+    .o_abj_selected { background: $abj-taupe-tint; }
+
+    .o_abj_segmented {
+        display: flex; gap: 0.5rem;
+        .btn { flex: 1 1 0; min-height: 44px; border-radius: 10px; font-weight: 600; }
+    }
+    .o_abj_switch {
+        display: flex; align-items: center; gap: 0.75rem; min-height: 44px; margin: 0; padding-left: 0; cursor: pointer;
+        .form-check-input { flex: 0 0 auto; width: 2.6em; height: 1.4em; margin: 0; float: none; }
+        .form-check-input:checked { background-color: $abj-taupe; border-color: $abj-taupe; }
+        .form-check-label { color: $abj-slate; cursor: pointer; }
+    }
+    .o_abj_port { flex: 0 0 6.5rem; }
+    .o_abj_copies { width: auto; min-height: 40px; border-radius: 10px; border-color: $abj-line; }
+    .o_abj_icon_btn { flex: 0 0 auto; width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+    .o_abj_order_btn { display: flex; align-items: center; text-align: left; }
+    .o_abj_receipt_preview {
+        display: block; max-width: 100%; margin: 0 auto; background: #fff; image-rendering: pixelated;
+        border: 1px solid $abj-line; border-radius: 4px; box-shadow: 0 2px 8px rgba(34, 52, 58, 0.12);
+    }
+    .o_abj_kv {
+        display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; border-top: 1px solid $abj-line-soft;
+        &:first-of-type { border-top: 0; }
+        span:last-child { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+    }
 }
 
 @media (max-width: 575.98px) {
     .o_checkinme_screen .o_checkinme_main { padding-left: 0.75rem; padding-right: 0.75rem; }
     .o_checkinme_screen .o_checkinme_stat_value { font-size: 1.25rem; }
+}
+
+// Receipt printed through the system print dialog (transports.js, "system"): the receipt image is
+// put in a container appended to <body>; while body has o_abj_printing only that container prints.
+.o_abj_print_area { display: none; }
+@media print {
+    html:has(> body.o_abj_printing) { height: auto !important; overflow: visible !important; }
+    body.o_abj_printing {
+        height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+        > *:not(.o_abj_print_area) { display: none !important; }
+        .o_abj_print_area {
+            display: block !important;
+            position: static;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+            img { display: block; max-width: 100%; height: auto; }
+        }
+    }
 }
