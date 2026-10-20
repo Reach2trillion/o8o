@@ -1,0 +1,142 @@
+# Builds the ABJ Android app (Capacitor shell in mobile/, see mobile/README.md).
+#
+# Repository settings (Settings > Secrets and variables > Actions), all optional:
+#   variable ABJ_SERVER_URL         Odoo server origin loaded by the app, e.g. https://erp.example.com
+#   variable ABJ_APP_ID             Android applicationId (default com.abj.app)
+#   secret   GOOGLE_SERVICES_JSON   base64 of the Firebase google-services.json (push notifications)
+#   secrets  ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+#                                   release signing; without them only the debug APK is built
+name: ABJ Android app
+
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/abj-android.yml'
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: 'Odoo server origin, e.g. https://erp.example.com (empty: repository variable ABJ_SERVER_URL)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: abj-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      ABJ_SERVER_URL: ${{ inputs.server_url || vars.ABJ_SERVER_URL }}
+      ABJ_APP_ID: ${{ vars.ABJ_APP_ID }}
+      ABJ_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+          cache-dependency-path: |
+            mobile/android/*.gradle
+            mobile/android/app/*.gradle
+            mobile/android/gradle/wrapper/gradle-wrapper.properties
+            mobile/package-lock.json
+
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 build-tools;35.0.0'
+
+      - name: Install npm packages
+        run: npm ci
+
+      - name: Check the server URL
+        run: |
+          if [ -z "$ABJ_SERVER_URL" ]; then
+            echo "::warning::ABJ_SERVER_URL is not set (repository variable or workflow input): the APK opens the placeholder https://erp.example.com"
+          else
+            echo "Server: $ABJ_SERVER_URL"
+          fi
+
+      - name: Write google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+            echo "google-services.json written: push notifications enabled"
+          else
+            echo "::warning::Secret GOOGLE_SERVICES_JSON is not set: the APK is built without push notifications"
+          fi
+
+      - name: Sync the Capacitor project
+        run: npx cap sync android
+
+      - name: Build the debug APK
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Decode the release keystore
+        id: keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/abj-release.jks"
+            echo "file=$RUNNER_TEMP/abj-release.jks" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release signing secrets are not set: only the debug APK is built"
+          fi
+
+      - name: Build the signed release APK
+        if: steps.keystore.outputs.file != ''
+        working-directory: mobile/android
+        env:
+          ABJ_KEYSTORE_FILE: ${{ steps.keystore.outputs.file }}
+          ABJ_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ABJ_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ABJ_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
+
+      - name: Remove secrets from the workspace
+        if: always()
+        run: rm -f android/app/google-services.json "$RUNNER_TEMP/abj-release.jks"
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: abj-debug-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload the release APK
+        if: steps.keystore.outputs.file != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: abj-release-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

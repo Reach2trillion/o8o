@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ABJ SkinCare palette (same as the Sale Check phone screen) -->
+    <color name="abj_slate">#22343A</color>
+    <color name="abj_taupe">#A58A76</color>
+    <color name="abj_rose">#C9A08A</color>
+    <color name="abj_cream">#F7F2ED</color>
+
+    <!-- Theme colors (override the Capacitor library defaults) -->
+    <color name="colorPrimary">#22343A</color>
+    <color name="colorPrimaryDark">#22343A</color>
+    <color name="colorAccent">#A58A76</color>
+
+    <!-- Adaptive launcher icon background (mipmap-anydpi-v26/ic_launcher.xml) -->
+    <color name="ic_launcher_background">#22343A</color>
+</resources>

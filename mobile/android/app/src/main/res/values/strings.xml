@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ABJ</string>
+    <string name="title_activity_main">ABJ</string>
+    <string name="package_name">com.abj.app</string>
+    <string name="custom_url_scheme">com.abj.app</string>
+
+    <!-- Notification channel abj_default (Android settings > Apps > ABJ > Notifications) -->
+    <string name="abj_channel_name">ABJ</string>
+    <string name="abj_channel_description">Planned visits, follow-up reminders and Odoo messages</string>
+
+    <!-- Downloads (AbjDownloads) -->
+    <string name="abj_download_started">Downloading %1$s…</string>
+    <string name="abj_download_saved">Saved to Downloads: %1$s</string>
+    <string name="abj_download_failed">Download failed</string>
+</resources>

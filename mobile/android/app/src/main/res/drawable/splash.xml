@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Splash before Android 12: ABJ mark centred on slate (Android 12+ uses the launch theme attributes). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/abj_slate" />
+    <item
+        android:width="216dp"
+        android:height="216dp"
+        android:drawable="@mipmap/ic_launcher_foreground"
+        android:gravity="center" />
+</layer-list>
